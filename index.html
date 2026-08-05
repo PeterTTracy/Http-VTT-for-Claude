@@ -164,6 +164,21 @@
   .exits .exit i{color:var(--dim); font-style:normal}
   .exits .exit.ready{opacity:1; border-color:var(--lamp); color:var(--lamp)}
   .exits .exit.ready i{color:var(--lamp)}
+  #overview{display:none; width:min(96vw,860px); margin-top:8px; background:var(--panel);
+    border:1px solid var(--grid); border-radius:4px; padding:10px 12px;
+    font-family:ui-monospace,monospace; font-size:11px; max-height:46vh; overflow-y:auto}
+  #overview.show{display:block}
+  #overview .flo{color:var(--dim); letter-spacing:.14em; text-transform:uppercase;
+    font-size:9.5px; margin:8px 0 5px; border-bottom:1px solid var(--grid); padding-bottom:3px}
+  #overview .flo:first-child{margin-top:0}
+  #overview .rooms{display:flex; flex-wrap:wrap; gap:5px}
+  #overview .rm{border:1px solid var(--grid); border-radius:3px; padding:4px 8px;
+    background:#0b0e10; color:var(--dim); display:flex; gap:6px; align-items:center}
+  #overview .rm.seen{color:var(--text)}
+  #overview .rm.here{border-color:var(--lamp); color:var(--lamp)}
+  #overview .rm .n{color:var(--steel); font-size:9.5px}
+  #overview .rm.here .n{color:var(--lamp)}
+  #overview .legend{color:var(--dim); font-size:9.5px; margin-top:8px}
   @media (max-width:520px){
     body{padding:10px 4px 22px}
     .init{flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start;
@@ -221,9 +236,11 @@
   <ul id="gmlog"></ul>
 </div>
 <div class="exits" id="exits" hidden></div>
+<div id="overview"></div>
 <div class="foot">
   <div class="measure" id="measure">drag a token to measure</div>
   <button class="btn" id="dice" title="dice roller">🎲</button>
+  <button class="btn" id="mapbtn" title="dungeon overview" hidden>🗺</button>
   <button class="btn" id="gmtoggle">⚙ GM</button>
   <button class="btn" id="reset" title="restore starting positions">↺ reset</button>
   <div class="dicerow" id="dicerow" hidden>
@@ -827,6 +844,207 @@ function drawProp(p,t){
   }
   ctx.restore();
 }
+/* ---------------------------- portals on the map ----------------------------
+   Every link that touches this room is drawn where it actually is: a stair
+   with its run of steps and an up/down arrow (inferred from the two rooms'
+   floors), a ladder's rungs, a door leaf swinging off the wall it sits in,
+   a portcullis, a rune-lit portal, a hole. Edge links get chevrons marching
+   off the map edge. Each is captioned with where it goes, and lights up
+   when a party member is standing on it. Drawn under the fog, so the party
+   only sees the ways out they have actually found. */
+const PORTAL_INK='#c9a86a', PORTAL_DIM='rgba(201,168,106,.55)';
+function portalDir(toRoom){                 // -1 down, +1 up, 0 same level
+  if(!WORLD) return 0;
+  const a=WORLD.rooms[WORLD.current], b=WORLD.rooms[toRoom];
+  if(!a||!b) return 0;
+  return Math.sign((b.floor||0)-(a.floor||0));
+}
+function wallSide(r,c){                     // which side of this cell is wall
+  const w=(rr,cc)=> rr<0||cc<0||rr>=ROWS||cc>=COLS||typeGrid[rr][cc]==='pit';
+  if(w(r-1,c)) return 'N'; if(w(r+1,c)) return 'S';
+  if(w(r,c-1)) return 'W'; if(w(r,c+1)) return 'E';
+  return 'N';
+}
+function arrowGlyph(ctx2,x,y,s,up){
+  ctx2.beginPath();
+  if(up){ ctx2.moveTo(x,y-s); ctx2.lineTo(x+s*.85,y+s*.6); ctx2.lineTo(x-s*.85,y+s*.6); }
+  else  { ctx2.moveTo(x,y+s); ctx2.lineTo(x+s*.85,y-s*.6); ctx2.lineTo(x-s*.85,y-s*.6); }
+  ctx2.closePath(); ctx2.fill();
+}
+function drawPortal(p){
+  const x=gx(p.c), y=gy(p.r), cx2=x+CELL/2, cy2=y+CELL/2;
+  const dir=portalDir(p.to);
+  ctx.save();
+  /* footprint so the square reads as "something is here" even at a glance */
+  ctx.fillStyle=p.ready?'rgba(217,163,90,.20)':'rgba(201,168,106,.09)';
+  ctx.fillRect(x+1,y+1,CELL-2,CELL-2);
+  ctx.strokeStyle=p.ready?'rgba(217,163,90,.85)':'rgba(201,168,106,.40)';
+  ctx.lineWidth=p.ready?2:1.2; ctx.setLineDash(p.ready?[]:[4,3]);
+  ctx.strokeRect(x+1.5,y+1.5,CELL-3,CELL-3); ctx.setLineDash([]);
+  ctx.strokeStyle=PORTAL_INK; ctx.fillStyle=PORTAL_INK; ctx.lineWidth=1.6;
+  switch(p.kind){
+  case 'stairs': {
+    /* a run of steps in shallow perspective, narrowing as it climbs away */
+    const n=5, top=y+CELL*0.16, bot=y+CELL*0.86, h=(bot-top)/n;
+    for(let i=0;i<n;i++){
+      const t=i/n, wNow=CELL*(0.74-t*0.30);
+      const sx=cx2-wNow/2, sy=bot-(i+1)*h;
+      ctx.fillStyle=`rgba(120,110,95,${.30+t*0.18})`;
+      ctx.fillRect(sx,sy,wNow,h-1.2);
+      ctx.strokeStyle=`rgba(220,200,165,${.30+t*.30})`; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(sx,sy+.5); ctx.lineTo(sx+wNow,sy+.5); ctx.stroke();
+    }
+    ctx.strokeStyle='rgba(20,16,12,.55)'; ctx.lineWidth=1.4;
+    ctx.beginPath();
+    ctx.moveTo(cx2-CELL*0.37,bot); ctx.lineTo(cx2-CELL*0.22,top);
+    ctx.moveTo(cx2+CELL*0.37,bot); ctx.lineTo(cx2+CELL*0.22,top); ctx.stroke();
+    /* the far end of the run tells you which way it goes: a downward stair
+       ends in darkness, an upward one in light */
+    const fw=CELL*0.44;
+    const fg=ctx.createLinearGradient(0,top-1,0,top+h*1.4);
+    if(dir<0){ fg.addColorStop(0,'rgba(0,0,0,.85)'); fg.addColorStop(1,'rgba(0,0,0,0)'); }
+    else { fg.addColorStop(0,'rgba(230,215,180,.30)'); fg.addColorStop(1,'rgba(230,215,180,0)'); }
+    ctx.fillStyle=fg; ctx.fillRect(cx2-fw/2, top-1, fw, h*1.4);
+    if(dir){ ctx.fillStyle=PORTAL_INK; arrowGlyph(ctx,cx2,dir>0?top+h*0.5:bot+3,CELL*0.11,dir>0); }
+    break; }
+  case 'ladder': {
+    const w2=CELL*0.34, top=y+CELL*0.12, bot=y+CELL*0.88;
+    ctx.strokeStyle='hsl(28,35%,45%)'; ctx.lineWidth=2.6;
+    ctx.beginPath();
+    ctx.moveTo(cx2-w2/2,top); ctx.lineTo(cx2-w2/2,bot);
+    ctx.moveTo(cx2+w2/2,top); ctx.lineTo(cx2+w2/2,bot); ctx.stroke();
+    ctx.lineWidth=1.8; ctx.strokeStyle='hsl(30,30%,52%)';
+    for(let i=0;i<5;i++){ const ry=top+(bot-top)*(i+0.5)/5;
+      ctx.beginPath(); ctx.moveTo(cx2-w2/2,ry); ctx.lineTo(cx2+w2/2,ry); ctx.stroke(); }
+    if(dir){ ctx.fillStyle=PORTAL_INK; arrowGlyph(ctx,cx2+w2*0.95,cy2,CELL*0.10,dir>0); }
+    break; }
+  case 'door': case 'secretdoor': {
+    const side=wallSide(p.r,p.c), horiz=(side==='N'||side==='S');
+    ctx.save(); ctx.translate(cx2,cy2); if(!horiz) ctx.rotate(Math.PI/2);
+    const dw=CELL*0.62, dh=CELL*0.16, oy=side==='S'?CELL*0.30:-CELL*0.30;
+    ctx.fillStyle=p.kind==='secretdoor'?'rgba(120,120,120,.35)':'hsl(28,34%,32%)';
+    ctx.fillRect(-dw/2,oy-dh/2,dw,dh);
+    ctx.strokeStyle='rgba(15,10,5,.8)'; ctx.lineWidth=1.6;
+    ctx.strokeRect(-dw/2,oy-dh/2,dw,dh);
+    ctx.strokeStyle=PORTAL_DIM; ctx.lineWidth=1.2; ctx.setLineDash([3,3]);
+    ctx.beginPath();                       // swing arc
+    ctx.arc(-dw/2, oy, dw*0.85, oy<0?0:-Math.PI/2, oy<0?Math.PI/2:0);
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='hsl(45,55%,60%)';
+    ctx.beginPath(); ctx.arc(dw/2-4, oy, 1.8, 0, 7); ctx.fill();
+    ctx.restore();
+    break; }
+  case 'gate': {
+    const gw=CELL*0.70, top=y+CELL*0.18, bot=y+CELL*0.82;
+    ctx.strokeStyle='hsl(210,8%,52%)'; ctx.lineWidth=2;
+    for(let i=0;i<4;i++){ const bx=cx2-gw/2+gw*i/3;
+      ctx.beginPath(); ctx.moveTo(bx,top); ctx.lineTo(bx,bot); ctx.stroke(); }
+    ctx.lineWidth=2.4;
+    for(const by of [top+2, (top+bot)/2, bot-2]){
+      ctx.beginPath(); ctx.moveTo(cx2-gw/2,by); ctx.lineTo(cx2+gw/2,by); ctx.stroke(); }
+    break; }
+  case 'portal': {
+    const R=CELL*0.34;
+    const g=ctx.createRadialGradient(cx2,cy2,2,cx2,cy2,R);
+    g.addColorStop(0,'rgba(170,120,220,.55)'); g.addColorStop(.7,'rgba(120,80,190,.28)');
+    g.addColorStop(1,'rgba(90,60,160,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.ellipse(cx2,cy2,R,R*1.15,0,0,7); ctx.fill();
+    ctx.strokeStyle='rgba(190,150,240,.85)'; ctx.lineWidth=1.8;
+    ctx.beginPath(); ctx.ellipse(cx2,cy2,R,R*1.15,0,0,7); ctx.stroke();
+    ctx.fillStyle='rgba(220,200,255,.75)';
+    for(let i=0;i<6;i++){ const a=i/6*6.283;
+      ctx.beginPath(); ctx.arc(cx2+Math.cos(a)*R*1.15, cy2+Math.sin(a)*R*1.3, 1.4,0,7); ctx.fill(); }
+    break; }
+  case 'hole': case 'chute': {
+    const R=CELL*0.32;
+    ctx.fillStyle='#07090b';
+    ctx.beginPath(); ctx.ellipse(cx2,cy2,R,R*0.8,0,0,7); ctx.fill();
+    ctx.strokeStyle='rgba(160,150,130,.6)'; ctx.lineWidth=1.6; ctx.stroke();
+    ctx.strokeStyle='rgba(0,0,0,.5)'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.ellipse(cx2,cy2+2,R*0.7,R*0.5,0,0,7); ctx.stroke();
+    break; }
+  default: {                                 // generic way out
+    ctx.strokeStyle=PORTAL_INK; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(cx2-CELL*0.18,cy2-CELL*0.22);
+    ctx.lineTo(cx2+CELL*0.18,cy2); ctx.lineTo(cx2-CELL*0.18,cy2+CELL*0.22); ctx.stroke();
+  }}
+  /* caption: where it goes */
+  const dest=WORLD&&WORLD.rooms[p.to];
+  const cap=(p.label?p.label:(dest?dest.name:p.to))
+    +(dir?(dir>0?' ▲':' ▼'):'');
+  ctx.font='7.5px ui-monospace,monospace'; ctx.textAlign='center';
+  ctx.fillStyle='rgba(8,10,12,.75)';
+  const wTxt=ctx.measureText(cap.toUpperCase()).width+6;
+  ctx.fillRect(cx2-wTxt/2, y+CELL-11, wTxt, 10);
+  ctx.fillStyle=p.ready?'#e8c98a':PORTAL_DIM;
+  ctx.fillText(cap.toUpperCase(), cx2, y+CELL-3.5);
+  ctx.restore();
+}
+function drawEdgePortal(e){
+  /* chevrons marching off the edge, with the destination named beside them */
+  const mid=e.edge==='N'||e.edge==='S' ? Math.floor(COLS/2) : Math.floor(ROWS/2);
+  const dest=WORLD&&WORLD.rooms[e.to];
+  const name=(e.label?e.label+' · ':'')+(dest?dest.name:e.to);
+  ctx.save();
+  ctx.strokeStyle=e.ready?'rgba(217,163,90,.9)':'rgba(201,168,106,.45)';
+  ctx.lineWidth=2.2;
+  const horiz=e.edge==='E'||e.edge==='W';
+  const sign=(e.edge==='E'||e.edge==='S')?1:-1;
+  const bx=e.edge==='E'?gx(COLS)-2 : e.edge==='W'?gx(0)+2
+          : e.edge==='S'?gy(ROWS)-2 : gy(0)+2;
+  for(let i=0;i<3;i++){
+    const off=i*7*sign, k=CELL*0.30;
+    ctx.beginPath();
+    if(horiz){
+      const px=bx-14*sign+off, py=gy(mid)+CELL/2;
+      ctx.moveTo(px,py-k); ctx.lineTo(px+7*sign,py); ctx.lineTo(px,py+k);
+    } else {
+      const py=bx-14*sign+off, px=gx(mid)+CELL/2;
+      ctx.moveTo(px-k,py); ctx.lineTo(px,py+7*sign); ctx.lineTo(px+k,py);
+    }
+    ctx.stroke();
+  }
+  ctx.font='8px ui-monospace,monospace';
+  ctx.fillStyle=e.ready?'#e8c98a':PORTAL_DIM;
+  ctx.textAlign='center';
+  if(horiz){
+    ctx.save();
+    ctx.translate(e.edge==='E'?gx(COLS)-CELL*0.30:gx(0)+CELL*0.30, gy(mid)+CELL/2);
+    ctx.rotate(sign*Math.PI/2);
+    ctx.fillStyle='rgba(8,10,12,.7)';
+    const wT=ctx.measureText(name.toUpperCase()).width+6;
+    ctx.fillRect(-wT/2,-9,wT,10);
+    ctx.fillStyle=e.ready?'#e8c98a':PORTAL_DIM;
+    ctx.fillText(name.toUpperCase(), 0, -1); ctx.restore();
+  } else {
+    ctx.fillText(name.toUpperCase(), gx(mid)+CELL/2,
+      e.edge==='S'?gy(ROWS)-CELL*0.55:gy(0)+CELL*0.62);
+  }
+  ctx.restore();
+}
+/* every link touching this room, as drawable portals */
+function roomPortals(){
+  if(!WORLD) return {cells:[], edges:[]};
+  const cells=[], edges=[], here=WORLD.current;
+  const readyKeys=new Set(S.tokens.filter(isParty)
+    .map(t=>{const l=linkAt(t.r,t.c); return l?l.key:null;}).filter(Boolean));
+  for(const L of WORLD.links){
+    if(L.edge){
+      if(L.from===here) edges.push({edge:L.edge, to:L.to, label:L.label,
+        ready:readyKeys.has('e'+L.to+L.edge)});
+      else if(L.both&&L.to===here) edges.push({edge:EDGES[L.edge], to:L.from,
+        label:L.label, ready:readyKeys.has('e'+L.from+L.edge)});
+    } else {
+      if(L.from.room===here) cells.push({r:L.from.r, c:L.from.c, kind:L.kind,
+        label:L.label, to:L.to.room, ready:readyKeys.has('c'+L.to.room+L.to.r+','+L.to.c)});
+      else if(L.both&&L.to.room===here) cells.push({r:L.to.r, c:L.to.c, kind:L.kind,
+        label:revLabel(L.label), to:L.from.room,
+        ready:readyKeys.has('c'+L.from.room+L.from.r+','+L.from.c)});
+    }
+  }
+  return {cells, edges};
+}
+
 const MARKER_COLORS={red:'226,93,74', orange:'255,150,50', yellow:'230,200,90',
   green:'126,176,105', blue:'111,169,173', purple:'170,120,220', white:'207,199,180'};
 function drawMarker(m){
@@ -919,6 +1137,9 @@ function drawScene(t){
     ctx.textAlign='right'; ctx.fillText(S.line.label.toUpperCase(), gx(COLS)-3, y-4);
   }
   for(const m of S.markers) drawMarker(m);
+  if(WORLD){ const pr=roomPortals();
+    for(const e of pr.edges) drawEdgePortal(e);
+    for(const p of pr.cells) drawPortal(p); }
   /* fog veils + feathered edges for fog & darkness */
   const F=14, nb=(rr,cc,ty)=> rr<0||cc<0||rr>=ROWS||cc>=COLS ? ty : typeGrid[rr][cc];
   for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
@@ -1284,7 +1505,7 @@ function moveTok(tk,to,instant){
     place(el,tk); pulse(el);
   }
   if(S.fow.on) refreshFOW(); else if(S.tokens.some(x=>x.aura)) repaint();
-  if(WORLD&&isParty(tk)) renderExits();
+  if(WORLD&&isParty(tk)){ renderExits(); repaint(); }
   return `${tk.name} → ${refOf(tk.r,tk.c)}`;
 }
 function applyCmd(cmd){
@@ -1402,6 +1623,19 @@ function applyCmd(cmd){
     const at=cmd.at!==undefined?parseRef(cmd.at):null;
     const room=enterRoom(id, at, cmd.quiet);
     return 'entered '+room.name; }
+  case 'addroom': case 'room_add': {
+    if(!WORLD) throw 'no world loaded — send a "world" command first';
+    const r=cmd.room||cmd;
+    const id=String(r.id||r.name||('room'+Object.keys(WORLD.rooms).length));
+    if(WORLD.rooms[id]&&!cmd.replace) throw `room "${id}" already exists (use "replace":true)`;
+    WORLD.rooms[id]=normScene(r);
+    WORLD.rooms[id].id=id;
+    WORLD.rooms[id].name=r.name||WORLD.rooms[id].header;
+    WORLD.rooms[id].floor=r.floor??0;
+    WORLD.pristine[id]=deep(WORLD.rooms[id]);
+    for(const L of (r.links||[])) WORLD.links.push(normLink(L));
+    renderExits(); repaint(); save();
+    return `room "${id}" added (${Object.keys(WORLD.rooms).length} rooms)`; }
   case 'link': {
     if(!WORLD) throw 'no world loaded — send a "world" command first';
     WORLD.links.push(normLink(cmd.link||cmd));
@@ -1677,6 +1911,7 @@ function enterRoom(id,at,quiet){
     from.initiative=from.initiative.filter(e=>!party.some(p=>p.id===e.t));
   }
   WORLD.current=id;
+  WORLD.visited=WORLD.visited||{}; WORLD.visited[id]=1;
   /* drop travellers in, spreading around the arrival square */
   const taken=new Set(dest.tokens.map(t=>t.r+','+t.c));
   const anchor=at||{r:0,c:0};
@@ -1695,6 +1930,7 @@ function enterRoom(id,at,quiet){
 }
 function loadWorld(inp){
   WORLD=normWorld(inp);
+  WORLD.visited={[WORLD.current]:1};
   const cur=WORLD.rooms[WORLD.current];
   S=cur; S0=WORLD.pristine[WORLD.current];
   buildBoard(); save();
@@ -1737,10 +1973,13 @@ const revLabel=l=> l?(REV_LABEL[String(l).toLowerCase()]||l):'';
 const KIND_MARK={door:'🚪', stairs:'⇕', edge:'▸', gate:'⛩', ladder:'⇕', portal:'✦'};
 function renderExits(){
   const bar=$('exits');
-  if(!WORLD){ bar.hidden=true; bar.innerHTML=''; return; }
+  if(!WORLD){ bar.hidden=true; bar.innerHTML='';
+    $('mapbtn').hidden=true; $('overview').classList.remove('show'); return; }
   const ex=currentExits();
   const room=WORLD.rooms[WORLD.current];
   bar.hidden=false;
+  $('mapbtn').hidden=false;
+  if($('overview').classList.contains('show')) renderOverview();
   bar.innerHTML=`<span class="here">${room.name}${room.floor?` · floor ${room.floor}`:''}</span>`+
     ex.map(e=>{
       const dest=WORLD.rooms[e.to];
@@ -1750,6 +1989,43 @@ function renderExits(){
         >${KIND_MARK[e.kind]||'▸'} ${dest?dest.name:e.to}${e.label?` <i>(${e.label})</i>`:''}</button>`;
     }).join('');
 }
+/* ---- dungeon overview: where am I, and what have we found so far ----
+   A mega-dungeon is dozens of rooms over several floors; this is the
+   orientation panel for it. Rooms the party has entered are lit, the
+   current one is ringed, and each shows how many ways lead out of it.
+   Read-only on purpose — you still travel by walking through a door. */
+function roomsByFloor(){
+  const byFloor=new Map();
+  for(const [id,r] of Object.entries(WORLD.rooms)){
+    const f=r.floor||0;
+    if(!byFloor.has(f)) byFloor.set(f,[]);
+    byFloor.get(f).push({id, r});
+  }
+  return [...byFloor.entries()].sort((a,b)=>b[0]-a[0]);   // upper floors first
+}
+function linkCount(id){
+  return WORLD.links.filter(L=>L.edge
+    ? (L.from===id||(L.both&&L.to===id))
+    : (L.from.room===id||(L.both&&L.to.room===id))).length;
+}
+function renderOverview(){
+  const box=$('overview');
+  if(!WORLD){ box.className=''; box.innerHTML=''; return; }
+  const floorName=f=> f===0?'ground floor' : f>0?`floor ${f}` : `floor ${f} · below`;
+  box.innerHTML=roomsByFloor().map(([f,list])=>
+    `<div class="flo">${floorName(f)}</div><div class="rooms">`+
+    list.map(({id,r})=>{
+      const here=id===WORLD.current, seen=WORLD.visited&&WORLD.visited[id];
+      return `<span class="rm${here?' here':seen?' seen':''}" title="${id}">`+
+        `${here?'◉ ':''}${r.name}<span class="n">${linkCount(id)} ways</span></span>`;
+    }).join('')+'</div>').join('')
+    +`<div class="legend">${Object.keys(WORLD.rooms).length} rooms · `+
+     `${WORLD.links.length} links · lit = visited, ringed = you are here</div>`;
+}
+$('mapbtn').addEventListener('click',()=>{
+  $('overview').classList.toggle('show');
+  if($('overview').classList.contains('show')) renderOverview();
+});
 $('exits').addEventListener('click',e=>{
   const b=e.target.closest('.exit'); if(!b) return;
   if(!b.classList.contains('ready')){
@@ -2010,7 +2286,7 @@ function attachDrag(el, id){
     tk.r=dragTok.r??dragTok.r0; tk.c=dragTok.c??dragTok.c0;
     el.classList.remove('dragging'); place(el,tk); dragTok=null;
     if(S.fow.on) refreshFOW(); else if(tk.aura) repaint();
-    if(WORLD&&isParty(tk)) renderExits();
+    if(WORLD&&isParty(tk)){ renderExits(); repaint(); }
     if(!moved){
       const now=Date.now();
       if(now-(el._tap||0)<300){ cycleToken(tk); el._tap=0; }
@@ -2023,7 +2299,7 @@ function attachDrag(el, id){
 
 /* =============================== boot =============================== */
 window.VTT={ apply:applyBatch, state:()=>S, stateForGM,
-  vis:()=>visGrid, light:()=>lightGrid };
+  vis:()=>visGrid, light:()=>lightGrid, world:()=>WORLD };
 (async function boot(){
   let hashData=null;
   const m=location.hash.match(/#s=([A-Za-z0-9_-]+)/);

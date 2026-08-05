@@ -19,10 +19,15 @@ off tokens, narration banners across the top.
   sea life, dinosaurs, dungeon dressing — with per-kind styling
   (pc / ally / foe / mark), Large & Huge sizes, HP bars, wound and down
   states, auras, and up to 3 condition badges per token.
-- **Worlds** — many rooms joined by doors, stairs and map edges, so a
-  dungeon can be bigger than one grid, span floors, or be a settlement the
-  party keeps returning to. Each room keeps its own tokens, initiative and
-  fog memory; the party travels between them carrying HP and conditions.
+- **Worlds** — many rooms joined by doors, stairs, ladders, gates, portals
+  and map edges, so a dungeon can be bigger than one grid, span floors, or
+  be a settlement the party keeps returning to. Each room keeps its own
+  tokens, initiative and fog memory; the party travels between them
+  carrying HP and conditions. Every way out is drawn on the square it
+  occupies — steps, rungs, a swinging door — captioned with its destination
+  and an ▲/▼ from the floor difference, and lit when someone stands on it.
+  Rooms can be added one at a time, so a mega-dungeon grows as the party
+  explores it, and a 🗺 overview groups every room by floor.
 - **Fog of war with real line of sight** — shadowcasting from each party
   member, walls that block sight and light, bright/dim/dark light levels
   from ambient plus every torch and hearth, darkvision (and magical
@@ -85,6 +90,7 @@ Everything is also scriptable from the page itself:
 | `test/smoke.js` | Playwright regression suite (31 checks) — `node test/smoke.js` |
 | `test/fow.js` | Fog of war / line of sight / light suite (24 checks) |
 | `test/world.js` | Room-to-room continuity suite (30 checks) |
+| `test/mega.js` | Mega-dungeon scale + portal art suite (12 checks) |
 | `CLAUDE.md` | Briefing for Claude sessions run from this repo |
 
 ## Credits

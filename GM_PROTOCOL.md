@@ -44,7 +44,8 @@ still applies.
 | scene | `{"do":"scene","scene":{…}}` | Replace the whole encounter (schema below); leaves world mode |
 | world | `{"do":"world","world":{…}}` | Load a multi-room dungeon or settlement (see Worlds below) |
 | room | `{"do":"room","to":"cellar","at":"C6"}` | Move the party to another room; `at` optional |
-| link | `{"do":"link","from":{"room":"hall","at":"L7"},"to":{"room":"cellar","at":"C6"},"kind":"stairs","label":"down"}` | Join two rooms — or two map edges with `{"from":"a1","to":"a2","edge":"E"}` |
+| link | `{"do":"link","from":{"room":"hall","at":"L7"},"to":{"room":"cellar","at":"C6"},"kind":"stairs","label":"down"}` | Join two rooms — or two map edges with `{"from":"a1","to":"a2","edge":"E"}`. `kind` draws the way out on the map: `stairs` `ladder` `door` `secretdoor` `gate` `portal` `hole` |
+| addroom | `{"do":"addroom","room":{…}}` | Add one room to a loaded world — build a mega-dungeon a wing at a time instead of pasting it all at once. `"replace":true` to overwrite; `"links":[…]` inside the room adds its connections |
 | title | `{"do":"title","header":"…","sub":"…"}` | Either field optional |
 | say | `{"do":"say","text":"…","tone":"danger"}` | Banner narration; tone: `info`/`danger`/`success` |
 | move | `{"do":"move","t":"K","to":"D7"}` | Animated; `"instant":true` to teleport |
@@ -142,6 +143,17 @@ stays where it lives.
      "kind":"stairs","label":"down"}]}}
 ```
 
+**Ways in and out are drawn where they are.** Each link that touches the
+current room is painted on its square — a stair with its run of steps, a
+ladder's rungs, a door swinging off the wall it sits in, a portcullis, a
+rune-lit portal, a hole — captioned with where it goes and an ▲/▼ taken
+from the two rooms' floors, so a stair down *looks* like a stair down (its
+far end falls into darkness; an upward one climbs into light). The square
+lights up gold when a party member is standing on it. Edge links get
+chevrons marching off that edge with the next room named beside them.
+Portals are drawn under the fog of war, so the party only sees the exits
+they have actually found.
+
 **Two kinds of link:**
 
 - **Cell links** join one square to another: a door, a stair, a ladder, a
@@ -162,6 +174,15 @@ footer shows the room's exits, greyed out until a party member is standing
 on the door or stair, then lit and tappable. Travellers arrive at the
 entry square and spread into the free squares around it, and are added to
 the new room's turn order if they aren't in it.
+
+**Building at mega-dungeon scale.** A world can hold as many rooms as you
+like — a 27-room, three-floor cavern builds in about a quarter of a second
+and serializes to ~30 KB. You do not have to send it in one message:
+open with `world` and one room, then `addroom` a wing at a time as the
+party pushes deeper, which is also how you keep a Wave Echo Cave or a
+Ravenloft manor manageable in chat. The 🗺 button opens an overview
+grouping every room by floor, lighting the ones the party has visited and
+ringing the one they are in.
 
 `{"do":"link", …}` adds a link to a loaded world (secret doors found later).
 `stateForGM` reports `world`, `room`, `floor` and the current `exits`, each
