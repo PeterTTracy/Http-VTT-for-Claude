@@ -19,6 +19,11 @@ off tokens, narration banners across the top.
   sea life, dinosaurs, dungeon dressing — with per-kind styling
   (pc / ally / foe / mark), Large & Huge sizes, HP bars, wound and down
   states, auras, and up to 3 condition badges per token.
+- **Fog of war with real line of sight** — shadowcasting from each party
+  member, walls that block sight and light, bright/dim/dark light levels
+  from ambient plus every torch and hearth, darkvision (and magical
+  darkness that defeats it), and explored-ground memory. Enemies render
+  only while the party can see them.
 - **Play aids** — drag-to-measure in feet with per-hazard warnings, a
   persistent ring on whoever's turn it is, initiative chips showing live HP,
   round counter, spell/AoE markers (circle · cone · line · square), token
@@ -74,6 +79,7 @@ Everything is also scriptable from the page itself:
 | `GM_PROTOCOL.md` | The JSON command language a Claude GM speaks |
 | `TOKENS_index.md` | Icon & condition id reference |
 | `test/smoke.js` | Playwright regression suite (31 checks) — `node test/smoke.js` |
+| `test/fow.js` | Fog of war / line of sight / light suite (24 checks) |
 | `CLAUDE.md` | Briefing for Claude sessions run from this repo |
 
 ## Credits

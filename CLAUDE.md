@@ -32,13 +32,18 @@ repo root, then open `http://localhost:8000/`.
   persistence, and the GM log stay in sync.
 - Grid refs are row-letter + column-number ("D7"); `normScene`/`normToken`
   convert external refs to internal 0-based `r`/`c`.
-- Verify with the regression suite: `node test/smoke.js` (needs Playwright;
+- Verify with the regression suites: `node test/smoke.js` and `node test/fow.js`
+  (need Playwright;
   preinstalled in Claude Code web sessions — `NODE_PATH=/opt/node22/lib/node_modules`
   if it isn't local). It serves the repo, drives `window.VTT.apply([...])`,
   asserts on `window.VTT.stateForGM()`, checks the board fits its viewport
   at phone and desktop sizes, and fails on any page error. Add a check when
   you add a command. Keep `node --check` passing on the extracted
   `<script>` body.
+- Fog of war lives in `computeLight`/`computeVision`/`drawFOW`: a light grid
+  (ambient + sources, occluded by walls), shadowcasting FOV per viewer, then
+  visibility = line of sight AND (lit OR within darkvision). Anything that
+  moves a token, a light, or a wall must call `refreshFOW()`, not `repaint()`.
 - Terrain painters live in `drawGround`/`drawWater`/`drawLava`/… and use
   `rnd(r,c,k)` for per-tile detail plus `macro(r,c)` for smooth
   low-frequency variation — use both so floors don't look like static.

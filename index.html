@@ -104,6 +104,7 @@
   .token.turn{box-shadow:0 0 0 2px #0f1316, 0 0 0 4.5px var(--lamp),
     0 4px 10px rgba(0,0,0,.6)}
   .token.anim{transition:left .5s cubic-bezier(.3,.85,.35,1), top .5s cubic-bezier(.3,.85,.35,1)}
+  .token.unseen{display:none}
   .token.sel{outline:2px dashed var(--lamp); outline-offset:3px}
   .token.pulse{animation:tkpulse .9s ease-out 2}
   @keyframes tkpulse{0%{box-shadow:0 0 0 0 rgba(217,163,90,.65)}
@@ -326,17 +327,34 @@ function normToken(t){
     icon:t.icon||null, r:p.r, c:p.c, size:clamp(t.size||1,1,3), hp,
     st:t.st||null, conds:(t.conds||[]).map(normCond).slice(0,3),
     aura:t.aura&&t.aura.ft?{ft:t.aura.ft, color:t.aura.color||'blue'}:null,
-    hidden:!!t.hidden};
+    hidden:!!t.hidden,
+    eyes:t.eyes,
+    vision:normVision(t)};
+}
+function normVision(t){
+  const dark=t.darkvision??(t.vision&&t.vision.dark)??0;
+  const normal=(t.vision&&t.vision.normal)??t.sight??0;
+  const blind=!!(t.vision&&t.vision.blind);
+  return (dark||normal||blind)?{dark, normal, blind}:null;
 }
 function normZone(z){
   const a=parseRef(z.from!==undefined?z.from:{r:z.r1,c:z.c1});
   const b=parseRef(z.to!==undefined?z.to:{r:z.r2,c:z.c2});
   return {r1:Math.min(a.r,b.r), c1:Math.min(a.c,b.c),
-          r2:Math.max(a.r,b.r), c2:Math.max(a.c,b.c), type:z.type};
+          r2:Math.max(a.r,b.r), c2:Math.max(a.c,b.c),
+          type:z.type==='wall'?'pit':z.type};   // "wall" reads better than "pit"
 }
 function normProp(p){
   const at=parseRef(p.at!==undefined?p.at:{r:p.r,c:p.c});
   return {...p, r:at.r, c:at.c};
+}
+/* a light is bright out to `bright` ft, dim to `dim` ft (legacy: rad in cells) */
+function normLight(L){
+  const p=parseRef(L.at!==undefined?L.at:{r:L.r,c:L.c});
+  const o={r:p.r, c:p.c, rad:L.rad||2.2};
+  if(L.bright!==undefined) o.bright=L.bright;
+  if(L.dim!==undefined) o.dim=L.dim;
+  return o;
 }
 const DIRS={E:0,SE:45,S:90,SW:135,W:180,NW:225,N:270,NE:315};
 function normMarker(m){
@@ -354,8 +372,10 @@ function normScene(inp){
     line:sc.line?{afterRow:sc.line.after!==undefined?parseRef(sc.line.after+'1').r:sc.line.afterRow,
                   label:sc.line.label||''}:null,
     props:(sc.props||[]).map(normProp),
-    lights:(sc.lights||[]).map(L=>{const p=parseRef(L.at!==undefined?L.at:{r:L.r,c:L.c});
-      return {r:p.r,c:p.c,rad:L.rad||2.2};}),
+    lights:(sc.lights||[]).map(normLight),
+    fow:{on:!!(sc.fow&&(sc.fow.on??sc.fow)) || !!sc.fogOfWar,
+      ambient:(sc.fow&&sc.fow.ambient)||sc.ambient||'bright',
+      seen:(sc.fow&&sc.fow.seen)||null},
     tokens:(sc.tokens||[]).map(normToken),
     markers:(sc.markers||[]).map(normMarker),
     initiative:(sc.initiative||[]).map(e=>({name:e.name||e.label||'?',
@@ -914,6 +934,7 @@ function drawScene(t){
     if(nb(r,c-1,ty)!==ty) strip(x-F,y,F,CELL, x,0,x-F,0);
     if(nb(r,c+1,ty)!==ty) strip(x+CELL,y,F,CELL, x+CELL,0,x+CELL+F,0);
   }
+  drawFOW();
   ctx.font='9px ui-monospace,monospace'; ctx.fillStyle='#7d8489'; ctx.textAlign='center';
   for(let c=0;c<COLS;c++) ctx.fillText(c+1, gx(c)+CELL/2, MARGIN-8);
   ctx.textAlign='right';
@@ -931,6 +952,157 @@ function repaint(){
 }
 
 /* =============================== DOM: board & tokens =============================== */
+/* ===================== fog of war, line of sight & light =====================
+   Three layers, recomputed whenever anything that affects sight moves:
+     lightGrid  2 = bright, 1 = dim, 0 = dark, per cell — ambient light plus
+                every light source, each occluded by walls.
+     visGrid    2 = seen now in bright light, 1 = seen now (dim or by
+                darkvision), 0 = explored but not currently seen, -1 = never
+                seen. The party's shared view.
+     seenGrid   the memory that makes 0 different from -1; it lives in S so
+                it persists and survives a reload.
+   Sight is computed with recursive shadowcasting from each viewer (by
+   default the PCs and their allies). Walls block sight; fog zones are
+   heavy obscurement — you see the fog, not what's past it. A cell is
+   visible when it is in line of sight AND (lit, or inside the viewer's
+   darkvision). Magical darkness (`dark` zones) defeats darkvision. */
+let lightGrid=[], visGrid=null, magicDark=[], fowCv=null, fowDirty=true;
+const OCTANTS=[[1,0,0,1],[0,1,1,0],[0,-1,1,0],[-1,0,0,1],
+               [-1,0,0,-1],[0,-1,-1,0],[0,1,-1,0],[1,0,0,-1]];
+/* recursive shadowcasting: visits every cell visible from (oc,or) within
+   radius, calling out(col,row); blocks(col,row) stops sight beyond a cell */
+function castLight(oc,or,row,start,end,radius,xx,xy,yx,yy,out,blocks){
+  if(start<end) return;
+  let newStart=start;
+  for(let i=row;i<=radius;i++){
+    let blocked=false;
+    for(let dx=-i,dy=-i; dx<=0; dx++){
+      const X=oc+dx*xx+dy*xy, Y=or+dx*yx+dy*yy;
+      const lSlope=(dx-0.5)/(dy+0.5), rSlope=(dx+0.5)/(dy-0.5);
+      if(start<rSlope) continue;
+      if(end>lSlope) break;
+      const inside = X>=0&&Y>=0&&X<COLS&&Y<ROWS;
+      if(inside && dx*dx+dy*dy<=radius*radius) out(X,Y);
+      const solid = inside ? blocks(X,Y) : true;
+      if(blocked){
+        if(solid){ newStart=rSlope; continue; }
+        blocked=false; start=newStart;
+      } else if(solid && i<radius){
+        blocked=true;
+        castLight(oc,or,i+1,start,lSlope,radius,xx,xy,yx,yy,out,blocks);
+        newStart=rSlope;
+      }
+    }
+    if(blocked) break;
+  }
+}
+function fov(oc,or,radius,blocks,out){
+  if(oc<0||or<0||oc>=COLS||or>=ROWS) return;
+  out(oc,or);
+  for(const [xx,xy,yx,yy] of OCTANTS)
+    castLight(oc,or,1,1,0,radius,xx,xy,yx,yy,out,blocks);
+}
+const blocksSight=(c,r)=>typeGrid[r][c]==='pit';                    // walls
+const blocksView =(c,r)=>{const t=typeGrid[r][c]; return t==='pit'||t==='fog';};
+const AMB={bright:2, dim:1, dark:0};
+function computeLight(){
+  const amb=AMB[S.fow.ambient]??2;
+  lightGrid=[...Array(ROWS)].map(()=>Array(COLS).fill(amb));
+  magicDark=[...Array(ROWS)].map(()=>Array(COLS).fill(false));
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)
+    if(typeGrid[r][c]==='dark'){ lightGrid[r][c]=0; magicDark[r][c]=true; }
+  const sources=[
+    ...S.lights.map(L=>({r:L.r, c:L.c,
+      bright:L.bright!==undefined?L.bright/5:(L.rad||2.2),
+      dim:L.dim!==undefined?L.dim/5:(L.rad||2.2)*2})),
+    ...S.props.filter(p=>p.kind==='hearth'||p.glyph==='🔥')
+      .map(p=>({r:p.r, c:p.c, bright:2, dim:4})),
+  ];
+  for(const L of sources){
+    fov(L.c, L.r, Math.ceil(L.dim), blocksSight, (x,y)=>{
+      if(magicDark[y][x]) return;                 // magical darkness swallows light
+      const d=Math.hypot(x-L.c, y-L.r);
+      const lvl = d<=L.bright?2 : d<=L.dim?1 : 0;
+      if(lvl>lightGrid[y][x]) lightGrid[y][x]=lvl;
+    });
+  }
+}
+const isViewer=tk=> tk.eyes!==undefined ? !!tk.eyes
+  : (tk.kind==='pc'||tk.kind==='ally') && !tk.hidden;
+function ensureSeen(){
+  if(!Array.isArray(S.fow.seen) || S.fow.seen.length!==ROWS ||
+     (S.fow.seen[0]||[]).length!==COLS)
+    S.fow.seen=[...Array(ROWS)].map(()=>Array(COLS).fill(0));
+}
+function computeVision(){
+  fowDirty=true;
+  if(!S.fow.on){ visGrid=null; return; }
+  computeLight(); ensureSeen();
+  const viewers=S.tokens.filter(isViewer);
+  const now=[...Array(ROWS)].map(()=>Array(COLS).fill(0));
+  if(!viewers.length){                     // nobody to see for — show everything
+    visGrid=[...Array(ROWS)].map(()=>Array(COLS).fill(2));
+    return;
+  }
+  const reach=Math.max(ROWS,COLS)+2;
+  for(const tk of viewers){
+    const oc=tk.c+((tk.size-1)>>1), or=tk.r+((tk.size-1)>>1);
+    const darkCells=(tk.vision&&tk.vision.dark||0)/5;
+    const sightCells=(tk.vision&&tk.vision.normal)? tk.vision.normal/5 : reach;
+    if(tk.vision&&tk.vision.blind) continue;
+    fov(oc, or, Math.min(reach, sightCells), blocksView, (x,y)=>{
+      const d=Math.hypot(x-oc, y-or);
+      let lvl=lightGrid[y][x];
+      /* darkvision: darkness reads as dim light, but not magical darkness */
+      if(lvl===0 && d<=darkCells && !magicDark[y][x]) lvl=1;
+      if(lvl>0 && lvl>now[y][x]) now[y][x]=lvl;
+    });
+    now[or][oc]=Math.max(now[or][oc],1);   // you always know your own square
+  }
+  visGrid=[...Array(ROWS)].map((_,r)=>Array.from({length:COLS},(_,c)=>{
+    if(now[r][c]>0){ S.fow.seen[r][c]=1; return now[r][c]; }
+    return S.fow.seen[r][c]?0:-1;
+  }));
+}
+/* Painted from a tiny one-pixel-per-cell canvas scaled up with smoothing,
+   which turns the cell grid into a soft gradient for free. */
+function drawFOW(){
+  if(!visGrid) return;
+  const pad=1, w=COLS+pad*2, h=ROWS+pad*2;
+  if(!fowCv) fowCv=document.createElement('canvas');
+  if(fowDirty||fowCv.width!==w){
+    fowCv.width=w; fowCv.height=h;
+    const g=fowCv.getContext('2d'), img=g.createImageData(w,h);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const r=y-pad, c=x-pad;
+      const v=(r>=0&&c>=0&&r<ROWS&&c<COLS)?visGrid[r][c]:-1;
+      const a=v===2?0 : v===1?.34 : v===0?.72 : .95;
+      const i=(y*w+x)*4;
+      img.data[i]=5; img.data[i+1]=7; img.data[i+2]=9; img.data[i+3]=a*255;
+    }
+    g.putImageData(img,0,0);
+    fowDirty=false;
+  }
+  ctx.save(); ctx.imageSmoothingEnabled=true;
+  ctx.drawImage(fowCv, gx(0)-CELL*pad, gy(0)-CELL*pad, w*CELL, h*CELL);
+  ctx.restore();
+}
+function tokenSeen(tk){
+  if(!visGrid||isViewer(tk)) return true;
+  for(let r=tk.r;r<tk.r+tk.size;r++)
+    for(let c=tk.c;c<tk.c+tk.size;c++)
+      if(visGrid[r]&&visGrid[r][c]>0) return true;
+  return false;
+}
+function applyTokenVisibility(){
+  for(const tk of S.tokens){
+    const el=live.get(tk.id);
+    if(el) el.classList.toggle('unseen', !tokenSeen(tk));
+  }
+}
+/* everything that can change sight funnels through here */
+function refreshFOW(){ computeVision(); applyTokenVisibility(); repaint(); }
+
 let distGrid=[];
 function rebuildTypeGrid(){
   typeGrid=[...Array(ROWS)].map(()=>Array(COLS).fill('ground'));
@@ -1010,7 +1182,7 @@ function buildBoard(){
     board.children[p.r*COLS+p.c].appendChild(t);
   }
   for(const tk of S.tokens) makeTokenEl(tk);
-  rebuildTypeGrid(); repaint();
+  rebuildTypeGrid(); computeVision(); applyTokenVisibility(); repaint();
   renderHeader(); renderChips(); renderLegend();
   sizeViewport();
 }
@@ -1101,7 +1273,7 @@ function moveTok(tk,to,instant){
       setTimeout(()=>el.classList.remove('anim'),550); }
     place(el,tk); pulse(el);
   }
-  if(S.tokens.some(x=>x.aura)) repaint();
+  if(S.fow.on) refreshFOW(); else if(S.tokens.some(x=>x.aura)) repaint();
   return `${tk.name} → ${refOf(tk.r,tk.c)}`;
 }
 function applyCmd(cmd){
@@ -1147,6 +1319,7 @@ function applyCmd(cmd){
     if(S.tokens.some(t=>t.id===tk.id)) throw `id "${tk.id}" already on the board`;
     tk.r=clamp(tk.r,0,ROWS-tk.size); tk.c=clamp(tk.c,0,COLS-tk.size);
     S.tokens.push(tk); const el=makeTokenEl(tk); if(el) pulse(el);
+    if(S.fow.on) refreshFOW();
     if(cmd.init) S.initiative.splice(clamp(cmd.init.after??S.initiative.length,0,S.initiative.length),0,
       {name:cmd.init.name||tk.name, detail:'', kind:tk.kind, t:tk.id});
     renderChips();
@@ -1156,7 +1329,7 @@ function applyCmd(cmd){
     S.tokens=S.tokens.filter(t=>t!==tk);
     const el=live.get(tk.id); if(el){el.remove(); live.delete(tk.id);}
     if(selected===tk.id){selected=null; renderInspector();}
-    renderChips(); return `${tk.name} removed`; }
+    renderChips(); if(S.fow.on) refreshFOW(); return `${tk.name} removed`; }
   case 'marker': {
     const m=normMarker(cmd.marker||cmd);
     S.markers=S.markers.filter(x=>x.id!==m.id); S.markers.push(m);
@@ -1167,15 +1340,14 @@ function applyCmd(cmd){
     repaint(); return 'markers cleared';
   case 'zone':
     S.zones.push(normZone(cmd.zone||cmd));
-    rebuildTypeGrid(); repaint(); return 'zone added';
+    rebuildTypeGrid(); refreshFOW(); return 'zone added';
   case 'clearzones':
     S.zones=cmd.type?S.zones.filter(z=>z.type!==cmd.type):[];
-    rebuildTypeGrid(); repaint(); return 'zones cleared';
+    rebuildTypeGrid(); refreshFOW(); return 'zones cleared';
   case 'light': {
-    const p=parseRef(cmd.at);
-    S.lights.push({r:p.r,c:p.c,rad:cmd.rad||2.2});
-    repaint(); return 'light at '+cmd.at; }
-  case 'clearlights': S.lights=[]; repaint(); return 'lights out';
+    S.lights.push(normLight(cmd));
+    refreshFOW(); return 'light at '+cmd.at; }
+  case 'clearlights': S.lights=[]; refreshFOW(); return 'lights out';
   case 'prop': {
     const p=normProp(cmd.prop||cmd);
     S.props.push(p);
@@ -1183,7 +1355,7 @@ function applyCmd(cmd){
       t.className='prop'+(p.big?' big':''); t.textContent=p.glyph;
       t.style.fontSize=(p.big?CELL*0.62:CELL*0.5)+'px';
       board.children[p.r*COLS+p.c].appendChild(t); }
-    repaint(); return `${p.kind||p.glyph} at ${refOf(p.r,p.c)}`; }
+    refreshFOW(); return `${p.kind||p.glyph} at ${refOf(p.r,p.c)}`; }
   case 'unprop': {
     const p=parseRef(cmd.at);
     S.props=S.props.filter(x=>{
@@ -1213,11 +1385,32 @@ function applyCmd(cmd){
   case 'next': advanceTurn();
     return `turn: ${S.initiative[S.active]?.name||'—'} (R${S.round})`;
   case 'round': S.round=cmd.n||1; renderChips(); return 'round '+S.round;
+  case 'fow': case 'fog_of_war': {
+    if(cmd.on!==undefined) S.fow.on=!!cmd.on;
+    if(cmd.ambient) S.fow.ambient=cmd.ambient;
+    if(cmd.reset||cmd.forget){ S.fow.seen=null; ensureSeen(); }
+    if(cmd.reveal==='all'||cmd.reveal===true){
+      ensureSeen();
+      for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++) S.fow.seen[r][c]=1;
+    }
+    refreshFOW();
+    return `fog of war ${S.fow.on?'on':'off'} · ambient ${S.fow.ambient}`; }
+  case 'ambient':
+    S.fow.ambient=cmd.light||cmd.ambient||'bright';
+    refreshFOW(); return 'ambient light: '+S.fow.ambient;
+  case 'vision': {
+    const tk=findTok(cmd.t);
+    tk.vision=normVision(cmd);
+    if(cmd.eyes!==undefined) tk.eyes=!!cmd.eyes;
+    refreshFOW();
+    return `${tk.name} vision: ${tk.vision?`darkvision ${tk.vision.dark} ft`+
+      (tk.vision.normal?`, sight ${tk.vision.normal} ft`:'')+(tk.vision.blind?', blinded':'')
+      :'normal'}`; }
   case 'hide': {
     const tk=findTok(cmd.t); tk.hidden=true;
     const el=live.get(tk.id); if(el){el.remove(); live.delete(tk.id);}
     if(selected===tk.id) selectTok(null);
-    renderChips(); repaint(); return `${tk.name} hidden`; }
+    renderChips(); refreshFOW(); return `${tk.name} hidden`; }
   case 'reveal': {
     const tk=findTok(cmd.t);
     if(cmd.at) { const p=parseRef(cmd.at);
@@ -1225,7 +1418,7 @@ function applyCmd(cmd){
     tk.hidden=false;
     const el=live.get(tk.id)||makeTokenEl(tk);
     if(el) pulse(el);
-    renderChips(); repaint(); return `${tk.name} revealed at ${refOf(tk.r,tk.c)}`; }
+    renderChips(); refreshFOW(); return `${tk.name} revealed at ${refOf(tk.r,tk.c)}`; }
   case 'ping': { pingAt(parseRef(cmd.at)); return 'ping '+cmd.at; }
   case 'aura': {
     const tk=findTok(cmd.t);
@@ -1334,14 +1527,15 @@ let saveTimer=null;
 function save(){
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>stSet(SKEY,
-    JSON.stringify({v:4, s:S, s0:S0, feedSeq})), 300);
+    JSON.stringify({v:5, s:S, s0:S0, feedSeq})), 300);
 }
 async function tryRestore(){
   try{
     const raw=await stGet(SKEY); if(!raw) return;
     const st=JSON.parse(raw);
-    if(!st||st.v!==4||!st.s||!st.s.tokens) return;
+    if(!st||st.v!==5||!st.s||!st.s.tokens) return;
     S=st.s; if(st.s0) S0=st.s0;
+    S.fow=S.fow||{on:false, ambient:'bright', seen:null};   // pre-fow sessions
     feedSeq=st.feedSeq||0;
     buildBoard();
   }catch(e){}
@@ -1383,7 +1577,10 @@ function stateForGM(){
       status:statusOf(tk),
       ...(tk.conds.length?{conds:tk.conds}:{}),
       ...(tk.hidden?{hidden:true}:{}),
-      ...(tk.aura?{aura:tk.aura.ft+' ft'}:{})})),
+      ...(tk.aura?{aura:tk.aura.ft+' ft'}:{}),
+      ...(visGrid&&!tokenSeen(tk)?{unseen:true}:{})})),
+    ...(S.fow.on?{fow:{ambient:S.fow.ambient,
+      explored:S.fow.seen?S.fow.seen.flat().filter(Boolean).length+'/'+(ROWS*COLS):'0'}}:{}),
     ...(S.markers.length?{markers:S.markers.map(m=>({shape:m.shape, at:refOf(m.r,m.c),
       ft:m.ft, ...(m.label?{label:m.label}:{})}))}:{}),
   };
@@ -1580,7 +1777,7 @@ function attachDrag(el, id){
     const moved=Math.hypot(e.clientX-dragTok.startX, e.clientY-dragTok.startY)>6;
     tk.r=dragTok.r??dragTok.r0; tk.c=dragTok.c??dragTok.c0;
     el.classList.remove('dragging'); place(el,tk); dragTok=null;
-    if(tk.aura) repaint();
+    if(S.fow.on) refreshFOW(); else if(tk.aura) repaint();
     if(!moved){
       const now=Date.now();
       if(now-(el._tap||0)<300){ cycleToken(tk); el._tap=0; }
@@ -1592,7 +1789,8 @@ function attachDrag(el, id){
 }
 
 /* =============================== boot =============================== */
-window.VTT={ apply:applyBatch, state:()=>S, stateForGM };
+window.VTT={ apply:applyBatch, state:()=>S, stateForGM,
+  vis:()=>visGrid, light:()=>lightGrid };
 (async function boot(){
   let hashData=null;
   const m=location.hash.match(/#s=([A-Za-z0-9_-]+)/);

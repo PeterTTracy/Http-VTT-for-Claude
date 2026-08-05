@@ -59,9 +59,12 @@ still applies.
 | roll | `{"do":"roll","dice":"2d6+3","label":"club"}` | Rolls on the board and logs it; players also have a d4–d100 tray |
 | marker | `{"do":"marker","marker":{"shape":"circle","at":"F6","ft":10,"color":"purple","label":"web"}}` | Shapes: `circle` (radius ft), `cone` (length ft + `dir`), `line` (length ft + `dir` + width `w`), `square` (side ft, from top-left). `dir`: `N/NE/E/…` or degrees. Colors: red orange yellow green blue purple white. Same `id` replaces. |
 | unmark | `{"do":"unmark","id":"web"}` | Matches id or label; `{"do":"unmark"}` clears all |
-| zone | `{"do":"zone","from":"A1","to":"D16","type":"water"}` | Types: `water` (depth-shaded, foams at the shore) · `rough` · `swamp` · `lava` · `ice` · `fog` (translucent veil) · `dark` · `pit` (wall) |
+| zone | `{"do":"zone","from":"A1","to":"D16","type":"water"}` | Types: `water` (depth-shaded, foams at the shore) · `rough` · `swamp` · `lava` · `ice` · `fog` (translucent veil, blocks sight) · `dark` (magical darkness) · `wall` (blocks movement, sight and light; `pit` is the same thing) |
+| fow | `{"do":"fow","on":true}` | Fog of war master switch. Also `"ambient":"dark"`, `"reveal":"all"` (show the whole map), `"reset":true` (forget explored ground) |
+| ambient | `{"do":"ambient","light":"dark"}` | Scene light level: `bright` (daylight) · `dim` (dusk) · `dark` (night, dungeon) |
+| vision | `{"do":"vision","t":"D","darkvision":60}` | Per-token sight. Also `{"vision":{"normal":30,"blind":true}}` and `"eyes":true/false` to add or drop a token from the party's shared view |
 | clearzones | `{"do":"clearzones","type":"dark"}` | `type` optional |
-| light | `{"do":"light","at":"G13","rad":2.5}` | Warm lamplight pool (radius in cells) |
+| light | `{"do":"light","at":"G13","bright":20,"dim":40}` | Light source: bright to `bright` ft, dim to `dim` ft, occluded by walls. (Legacy `"rad"` in cells still works.) Hearths and 🔥 props light themselves. |
 | clearlights | `{"do":"clearlights"}` | |
 | prop | `{"do":"prop","kind":"barrel","at":"C3"}` | Kinds: tree pine rock table bar chair hearth barrel crate wagon haystack boat door — or `{"glyph":"🔥"}` |
 | unprop | `{"do":"unprop","at":"C3"}` | |
@@ -99,7 +102,48 @@ Token fields: `kind` is `pc` | `ally` | `foe` | `mark`; `size` 1–3 squares
 cur = max) or `{cur,max}`; `icon` any id from `TOKENS_index.md` (without the
 `tk-` prefix); `conds` up to 3 condition ids (with or without the `c-`
 prefix); `aura` `{ft,color}`; `hidden: true` to stage it off-board until
-you `reveal` it.
+you `reveal` it; `vision` `{dark, normal, blind}` (or `darkvision: 60`) and
+`eyes` to control whose eyes the board renders from.
+
+## Fog of war, line of sight & light
+
+Turn it on per scene with `"fow": true` (or `{"do":"fow","on":true}`) and set
+the scene's `"ambient"` light. The board then shows the players only what
+their party can actually see:
+
+- **Line of sight** is computed by shadowcasting from every viewer — by
+  default all `pc` and `ally` tokens. `wall` zones block sight and light;
+  `fog` zones are heavy obscurement (you see the fog, not what's beyond).
+- **Light** comes from `ambient` plus every light source, each occluded by
+  walls. A cell is bright, dim, or dark. Hearth props light themselves.
+- **Darkvision** (`{"do":"vision","t":"D","darkvision":60}`) lets a token
+  see darkness as dim light out to that range. Magical darkness (`dark`
+  zones) defeats it — that's the difference between a `dark` zone and an
+  unlit room.
+- **Memory**: ground the party has seen stays on the map, dimmed. Creatures
+  in it do not — an enemy that walks out of sight disappears until seen
+  again. Unexplored ground is black.
+- Enemy tokens are only rendered when the party can see them, so with fog
+  on you *can* place foes in advance; they stay invisible until the light
+  or the party reaches them. `stateForGM` marks them `"unseen": true`.
+- `{"do":"fow","reveal":"all"}` opens the whole map (end of a dungeon,
+  or a divination); `{"do":"fow","reset":true}` forgets explored ground;
+  `{"do":"fow","on":false}` turns the whole system off.
+
+A dark-dungeon opening looks like:
+
+```json
+[{"do":"scene","scene":{
+   "header":"Barrow of the Pale King","ground":"stone","rows":16,"cols":16,
+   "ambient":"dark","fow":true,
+   "zones":[{"from":"H6","to":"H12","type":"wall"}],
+   "props":[{"kind":"hearth","at":"D9"}],
+   "tokens":[
+     {"id":"D","name":"Dain","at":"E12","kind":"pc","icon":"dwarf","hp":30,"vision":{"dark":60}},
+     {"id":"B","name":"Bren","at":"F11","kind":"pc","icon":"wizard","hp":26},
+     {"id":"g1","name":"Ghoul","at":"J8","kind":"foe","icon":"ghoul","hp":18}]}},
+ {"do":"say","text":"Your torch gutters. Something shifts in the dark ahead.","tone":"danger"}]
+```
 
 ## GM practices
 
