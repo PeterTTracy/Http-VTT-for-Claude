@@ -107,7 +107,9 @@ links.push({ from: { room: 'cav8', at: 'Q17' }, to: { room: 'deep0', at: 'D4' },
       { from: { room: 'gal', at: 'C5' }, to: { room: 'up', at: 'B2' }, kind: 'stairs', label: 'up' },
       { from: { room: 'gal', at: 'C8' }, to: { room: 'dn', at: 'B2' }, kind: 'stairs', label: 'down' },
       { from: { room: 'gal', at: 'F3' }, to: { room: 'hall', at: 'B2' }, kind: 'door' },
-      { from: { room: 'gal', at: 'F10' }, to: { room: 'vault', at: 'B2' }, kind: 'gate', label: 'vault' },
+      { from: { room: 'gal', at: 'F10' }, to: { room: 'vault', at: 'B2' }, kind: 'gate', label: 'portcullis' },
+      { from: { room: 'gal', at: 'F6' }, to: { room: 'vault', at: 'C3' }, kind: 'vault', label: 'vault' },
+      { from: { room: 'gal', at: 'D9' }, to: { room: 'hall', at: 'C3' }, kind: 'secretdoor', label: 'secret' },
       { from: { room: 'gal', at: 'I5' }, to: { room: 'weird', at: 'B2' }, kind: 'portal', label: 'rune' },
       { from: { room: 'gal', at: 'I8' }, to: { room: 'pit', at: 'B2' }, kind: 'ladder', label: 'down' },
       { from: { room: 'gal', at: 'K6' }, to: { room: 'sump', at: 'B2' }, kind: 'hole', label: 'chute' },
@@ -120,6 +122,8 @@ links.push({ from: { room: 'cav8', at: 'Q17' }, to: { room: 'deep0', at: 'D4' },
   await page.evaluate(() => window.VTT.apply({ do: 'move', t: 'K', to: 'C5' }));
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(SHOTS, 'portal-ready.png') });
+  checks.push(['every portal kind drawn without error',
+    await page.evaluate(() => window.VTT.world().links.length) === 10]);
 
   let fail = 0;
   for (const [n, ok] of checks) { console.log((ok ? 'PASS' : 'FAIL') + '  ' + n); if (!ok) fail++; }

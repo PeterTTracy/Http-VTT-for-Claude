@@ -919,29 +919,81 @@ function drawPortal(p){
     if(dir){ ctx.fillStyle=PORTAL_INK; arrowGlyph(ctx,cx2+w2*0.95,cy2,CELL*0.10,dir>0); }
     break; }
   case 'door': case 'secretdoor': {
+    /* the architectural symbol: two jambs with a gap between them, the leaf
+       swung open on its hinge, and a dashed arc showing the swing */
     const side=wallSide(p.r,p.c), horiz=(side==='N'||side==='S');
     ctx.save(); ctx.translate(cx2,cy2); if(!horiz) ctx.rotate(Math.PI/2);
-    const dw=CELL*0.62, dh=CELL*0.16, oy=side==='S'?CELL*0.30:-CELL*0.30;
-    ctx.fillStyle=p.kind==='secretdoor'?'rgba(120,120,120,.35)':'hsl(28,34%,32%)';
-    ctx.fillRect(-dw/2,oy-dh/2,dw,dh);
-    ctx.strokeStyle='rgba(15,10,5,.8)'; ctx.lineWidth=1.6;
-    ctx.strokeRect(-dw/2,oy-dh/2,dw,dh);
-    ctx.strokeStyle=PORTAL_DIM; ctx.lineWidth=1.2; ctx.setLineDash([3,3]);
-    ctx.beginPath();                       // swing arc
-    ctx.arc(-dw/2, oy, dw*0.85, oy<0?0:-Math.PI/2, oy<0?Math.PI/2:0);
-    ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle='hsl(45,55%,60%)';
-    ctx.beginPath(); ctx.arc(dw/2-4, oy, 1.8, 0, 7); ctx.fill();
+    const span=CELL*0.86, gap=CELL*0.52, jamb=(span-gap)/2, th=CELL*0.13;
+    const secret=p.kind==='secretdoor';
+    /* jambs: stubs of wall either side of the opening */
+    ctx.fillStyle=secret?'rgba(120,124,128,.55)':'hsl(214,10%,34%)';
+    ctx.fillRect(-span/2, -th/2, jamb, th);
+    ctx.fillRect( gap/2,  -th/2, jamb, th);
+    ctx.strokeStyle='rgba(10,12,14,.75)'; ctx.lineWidth=1.2;
+    ctx.strokeRect(-span/2,-th/2,jamb,th); ctx.strokeRect(gap/2,-th/2,jamb,th);
+    /* threshold across the opening */
+    ctx.strokeStyle=secret?'rgba(150,150,150,.35)':'rgba(201,168,106,.35)';
+    ctx.setLineDash([2,3]); ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(-gap/2,0); ctx.lineTo(gap/2,0); ctx.stroke();
+    ctx.setLineDash([]);
+    /* swing arc from the hinge */
+    ctx.strokeStyle=PORTAL_DIM; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.arc(-gap/2, 0, gap, -Math.PI/2, 0); ctx.stroke();
+    ctx.setLineDash([]);
+    /* the leaf itself, hinged at the left jamb and swung 55° open */
+    ctx.save(); ctx.translate(-gap/2,0); ctx.rotate(-0.96);
+    ctx.fillStyle=secret?'rgba(140,140,140,.45)':'hsl(28,36%,34%)';
+    ctx.fillRect(0,-3.2,gap,6.4);
+    ctx.strokeStyle='rgba(12,8,4,.85)'; ctx.lineWidth=1.4;
+    ctx.strokeRect(0,-3.2,gap,6.4);
+    ctx.fillStyle='rgba(255,225,180,.18)'; ctx.fillRect(1,-2.6,gap-2,1.6);
+    ctx.fillStyle='hsl(45,60%,62%)';                       // handle
+    ctx.beginPath(); ctx.arc(gap-3.5,0,1.7,0,7); ctx.fill();
+    ctx.restore();
     ctx.restore();
     break; }
   case 'gate': {
-    const gw=CELL*0.70, top=y+CELL*0.18, bot=y+CELL*0.82;
-    ctx.strokeStyle='hsl(210,8%,52%)'; ctx.lineWidth=2;
-    for(let i=0;i<4;i++){ const bx=cx2-gw/2+gw*i/3;
-      ctx.beginPath(); ctx.moveTo(bx,top); ctx.lineTo(bx,bot); ctx.stroke(); }
-    ctx.lineWidth=2.4;
-    for(const by of [top+2, (top+bot)/2, bot-2]){
+    /* portcullis: lintel, barred grille, spiked feet, dark gap behind */
+    const gw=CELL*0.78, top=y+CELL*0.14, bot=y+CELL*0.84;
+    ctx.fillStyle='rgba(6,8,10,.55)';
+    ctx.fillRect(cx2-gw/2, top, gw, bot-top);
+    ctx.fillStyle='hsl(214,10%,32%)';                      // lintel
+    ctx.fillRect(cx2-gw/2-2, top-4, gw+4, 5);
+    ctx.strokeStyle='rgba(10,12,14,.8)'; ctx.lineWidth=1;
+    ctx.strokeRect(cx2-gw/2-2, top-4, gw+4, 5);
+    const nb=5;
+    for(let i=0;i<nb;i++){
+      const bx=cx2-gw/2+gw*(i+0.5)/nb;
+      ctx.strokeStyle='hsl(210,9%,58%)'; ctx.lineWidth=2.2;
+      ctx.beginPath(); ctx.moveTo(bx,top+1); ctx.lineTo(bx,bot-5); ctx.stroke();
+      ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=.8;
+      ctx.beginPath(); ctx.moveTo(bx-1,top+2); ctx.lineTo(bx-1,bot-6); ctx.stroke();
+      ctx.fillStyle='hsl(210,9%,52%)';                     // spiked foot
+      ctx.beginPath(); ctx.moveTo(bx-2.4,bot-5); ctx.lineTo(bx+2.4,bot-5);
+      ctx.lineTo(bx,bot); ctx.closePath(); ctx.fill();
+    }
+    ctx.strokeStyle='hsl(210,9%,46%)'; ctx.lineWidth=2;
+    for(const by of [top+(bot-top)*0.30, top+(bot-top)*0.66]){
       ctx.beginPath(); ctx.moveTo(cx2-gw/2,by); ctx.lineTo(cx2+gw/2,by); ctx.stroke(); }
+    break; }
+  case 'vault': {
+    /* a heavy round door: ring, bolts, spoked wheel */
+    const R=CELL*0.31;
+    ctx.fillStyle='hsl(214,9%,26%)';
+    ctx.beginPath(); ctx.arc(cx2,cy2,R,0,7); ctx.fill();
+    ctx.strokeStyle='hsl(210,10%,52%)'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(cx2,cy2,R,0,7); ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.arc(cx2,cy2,R-2,3.6,5.4); ctx.stroke();
+    ctx.fillStyle='hsl(210,10%,60%)';
+    for(let i=0;i<8;i++){ const a=i/8*6.283;
+      ctx.beginPath(); ctx.arc(cx2+Math.cos(a)*R*0.74, cy2+Math.sin(a)*R*0.74, 1.5,0,7); ctx.fill(); }
+    ctx.strokeStyle='hsl(45,45%,58%)'; ctx.lineWidth=2;   // wheel
+    ctx.beginPath(); ctx.arc(cx2,cy2,R*0.34,0,7); ctx.stroke();
+    ctx.lineWidth=1.6;
+    for(let i=0;i<4;i++){ const a=i/4*6.283+0.4;
+      ctx.beginPath(); ctx.moveTo(cx2+Math.cos(a)*R*0.12, cy2+Math.sin(a)*R*0.12);
+      ctx.lineTo(cx2+Math.cos(a)*R*0.46, cy2+Math.sin(a)*R*0.46); ctx.stroke(); }
     break; }
   case 'portal': {
     const R=CELL*0.34;

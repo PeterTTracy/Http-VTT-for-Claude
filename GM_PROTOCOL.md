@@ -44,7 +44,7 @@ still applies.
 | scene | `{"do":"scene","scene":{…}}` | Replace the whole encounter (schema below); leaves world mode |
 | world | `{"do":"world","world":{…}}` | Load a multi-room dungeon or settlement (see Worlds below) |
 | room | `{"do":"room","to":"cellar","at":"C6"}` | Move the party to another room; `at` optional |
-| link | `{"do":"link","from":{"room":"hall","at":"L7"},"to":{"room":"cellar","at":"C6"},"kind":"stairs","label":"down"}` | Join two rooms — or two map edges with `{"from":"a1","to":"a2","edge":"E"}`. `kind` draws the way out on the map: `stairs` `ladder` `door` `secretdoor` `gate` `portal` `hole` |
+| link | `{"do":"link","from":{"room":"hall","at":"L7"},"to":{"room":"cellar","at":"C6"},"kind":"stairs","label":"down"}` | Join two rooms — or two map edges with `{"from":"a1","to":"a2","edge":"E"}`. `kind` draws the way out on the map: `stairs` `ladder` `door` `secretdoor` `gate` (portcullis) `vault` `portal` `hole` |
 | addroom | `{"do":"addroom","room":{…}}` | Add one room to a loaded world — build a mega-dungeon a wing at a time instead of pasting it all at once. `"replace":true` to overwrite; `"links":[…]` inside the room adds its connections |
 | title | `{"do":"title","header":"…","sub":"…"}` | Either field optional |
 | say | `{"do":"say","text":"…","tone":"danger"}` | Banner narration; tone: `info`/`danger`/`success` |
@@ -145,8 +145,9 @@ stays where it lives.
 
 **Ways in and out are drawn where they are.** Each link that touches the
 current room is painted on its square — a stair with its run of steps, a
-ladder's rungs, a door swinging off the wall it sits in, a portcullis, a
-rune-lit portal, a hole — captioned with where it goes and an ▲/▼ taken
+ladder's rungs, a door drawn as the architectural symbol —
+jambs, swung leaf, swing arc — a portcullis with spiked feet, a bolted
+vault door, a rune-lit portal, a hole — captioned with where it goes and an ▲/▼ taken
 from the two rooms' floors, so a stair down *looks* like a stair down (its
 far end falls into darkness; an upward one climbs into light). The square
 lights up gold when a party member is standing on it. Edge links get
