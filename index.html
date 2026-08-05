@@ -848,23 +848,45 @@ function drawProp(p,t){
       ctx.moveTo(i*L*0.18,-B*0.38); ctx.lineTo(i*L*0.18,B*0.38); ctx.stroke(); }
     ctx.restore(); break;}
   case 'door':{
-    const side=wallSide(p.r,p.c), horiz=(side==='N'||side==='S');
-    ctx.save(); ctx.translate(cx2,cy2); if(!horiz) ctx.rotate(Math.PI/2);
-    const dw=Math.min(w,h)*0.80, dh=Math.min(w,h)*0.30;
-    ctx.fillStyle='hsl(214,10%,30%)';                      // stone frame
-    ctx.fillRect(-dw/2-3,-dh/2-3,dw+6,dh+6);
-    ctx.strokeStyle='rgba(0,0,0,.6)'; ctx.lineWidth=1.2;
-    ctx.strokeRect(-dw/2-3,-dh/2-3,dw+6,dh+6);
-    ctx.fillStyle=WOOD1; ctx.fillRect(-dw/2,-dh/2,dw,dh);  // leaf
-    ctx.strokeStyle=OUT; ctx.lineWidth=1.6; ctx.strokeRect(-dw/2,-dh/2,dw,dh);
-    ctx.strokeStyle='rgba(0,0,0,.3)'; ctx.lineWidth=1;     // planks
-    for(let i=1;i<4;i++){ ctx.beginPath();
-      ctx.moveTo(-dw/2+dw*i/4,-dh/2+1); ctx.lineTo(-dw/2+dw*i/4,dh/2-1); ctx.stroke(); }
-    ctx.fillStyle='hsl(210,8%,48%)';                       // hinges
-    ctx.fillRect(-dw/2+1,-dh/2+2,dw*0.16,2.4);
-    ctx.fillRect(-dw/2+1, dh/2-4.4,dw*0.16,2.4);
-    ctx.fillStyle='hsl(45,55%,60%)';                       // handle
-    ctx.beginPath(); ctx.arc(dw/2-5,0,2,0,7); ctx.fill();
+    /* A closed door read the way dungeon maps draw one: a recess cut through
+       the wall, stone jambs either side, and a plank-and-iron leaf filling
+       it. (The swinging-leaf symbol belongs to portal doors, which link
+       rooms — this one is furniture.) */
+    ctx.save(); ctx.translate(cx2,cy2);
+    if(wallRun(p.r,p.c)==='NS') ctx.rotate(Math.PI/2);
+    const M2=Math.min(w,h), gw=M2*0.94, th=M2*0.38, jw=gw*0.09;
+    ctx.fillStyle='#0a0c0e';                               // the opening itself
+    ctx.fillRect(-gw/2,-th/2,gw,th);
+    ctx.fillStyle='hsl(214,10%,40%)';                      // jambs
+    ctx.fillRect(-gw/2,-th/2-1,jw,th+2);
+    ctx.fillRect( gw/2-jw,-th/2-1,jw,th+2);
+    ctx.strokeStyle='rgba(0,0,0,.65)'; ctx.lineWidth=1;
+    ctx.strokeRect(-gw/2,-th/2-1,jw,th+2); ctx.strokeRect(gw/2-jw,-th/2-1,jw,th+2);
+    const lw=gw-jw*2, lh=th*0.82;
+    const wood=ctx.createLinearGradient(0,-lh/2,0,lh/2);   // the leaf
+    wood.addColorStop(0,'hsl(28,40%,44%)');
+    wood.addColorStop(.55,'hsl(27,38%,34%)');
+    wood.addColorStop(1,'hsl(26,36%,26%)');
+    ctx.fillStyle=wood; ctx.fillRect(-lw/2,-lh/2,lw,lh);
+    ctx.strokeStyle='rgba(10,6,2,.9)'; ctx.lineWidth=1.8;
+    ctx.strokeRect(-lw/2,-lh/2,lw,lh);
+    ctx.strokeStyle='rgba(0,0,0,.38)'; ctx.lineWidth=1;    // plank seams
+    for(let i=1;i<5;i++){ const px=-lw/2+lw*i/5;
+      ctx.beginPath(); ctx.moveTo(px,-lh/2+1.5); ctx.lineTo(px,lh/2-1.5); ctx.stroke(); }
+    ctx.fillStyle='hsl(212,9%,56%)';                       // iron bands
+    for(const by of [-lh*0.28, lh*0.28]){
+      ctx.fillRect(-lw/2+1.5, by-1.6, lw-3, 3.2);
+      ctx.fillStyle='rgba(255,255,255,.22)';
+      ctx.fillRect(-lw/2+1.5, by-1.6, lw-3, 1);
+      ctx.fillStyle='hsl(212,9%,56%)';
+    }
+    ctx.fillStyle='hsl(212,10%,34%)';                      // hinge straps
+    ctx.fillRect(-lw/2+1, -lh*0.40, lw*0.16, lh*0.16);
+    ctx.fillRect(-lw/2+1,  lh*0.24, lw*0.16, lh*0.16);
+    ctx.strokeStyle='hsl(45,55%,62%)'; ctx.lineWidth=1.8;  // ring handle
+    ctx.beginPath(); ctx.arc(lw*0.30,0,M2*0.055,0,7); ctx.stroke();
+    ctx.fillStyle='hsl(45,50%,58%)';
+    ctx.beginPath(); ctx.arc(lw*0.30,-M2*0.055,1.5,0,7); ctx.fill();
     ctx.restore();
     break;}
 
@@ -966,30 +988,50 @@ function drawProp(p,t){
     }
     break;}
   case 'forge':{
-    ctx.fillStyle='rgba(0,0,0,.3)';
-    ctx.beginPath(); ctx.ellipse(cx2,cy2+h*0.30,w*0.34,h*0.12,0,0,7); ctx.fill();
-    ctx.fillStyle='hsl(214,9%,22%)';                       // hood
-    ctx.beginPath();
-    ctx.moveTo(cx2-w*0.30,cy2+h*0.06);
-    ctx.lineTo(cx2-w*0.16,cy2-h*0.34); ctx.lineTo(cx2+w*0.16,cy2-h*0.34);
-    ctx.lineTo(cx2+w*0.30,cy2+h*0.06); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle='rgba(0,0,0,.6)'; ctx.lineWidth=1.4; ctx.stroke();
-    ctx.fillStyle='hsl(214,9%,30%)';                       // firebox
-    roundRect(x+w*0.16,cy2+h*0.04,w*0.68,h*0.28,2); ctx.fill();
-    ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.stroke();
+    /* stone furnace: chimney, body, arched mouth, a bed of live coals */
     const beat=0.6+0.4*Math.sin(t*3+p.c);
-    const gl=ctx.createRadialGradient(cx2,cy2+h*0.14,1,cx2,cy2+h*0.14,w*0.26);
-    gl.addColorStop(0,`rgba(255,${140+70*beat},60,.95)`);
-    gl.addColorStop(.6,`rgba(230,90,25,${.5+.2*beat})`);
-    gl.addColorStop(1,'rgba(200,60,20,0)');
-    ctx.fillStyle=gl;
-    ctx.beginPath(); ctx.ellipse(cx2,cy2+h*0.14,w*0.24,h*0.10,0,0,7); ctx.fill();
-    ctx.fillStyle='rgba(30,20,16,.8)';                     // coals
-    for(let i=0;i<5;i++){ ctx.beginPath();
-      ctx.arc(cx2-w*0.16+i*w*0.08, cy2+h*0.14+((i%2)?1.5:-1), 2.1,0,7); ctx.fill(); }
-    ctx.fillStyle=`rgba(255,210,120,${.5*beat})`;          // sparks
-    for(let i=0;i<3;i++){ ctx.beginPath();
-      ctx.arc(cx2-w*0.10+i*w*0.10, cy2-h*0.06-((t*22+i*7)%16), 1.1,0,7); ctx.fill(); }
+    ctx.fillStyle='rgba(0,0,0,.32)';
+    ctx.beginPath(); ctx.ellipse(cx2,y+h*0.90,w*0.36,h*0.08,0,0,7); ctx.fill();
+    ctx.fillStyle='hsl(214,8%,24%)';                       // chimney
+    ctx.beginPath();
+    ctx.moveTo(cx2-w*0.14,y+h*0.30); ctx.lineTo(cx2-w*0.09,y+h*0.08);
+    ctx.lineTo(cx2+w*0.09,y+h*0.08); ctx.lineTo(cx2+w*0.14,y+h*0.30);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,.6)'; ctx.lineWidth=1.2; ctx.stroke();
+    const body=ctx.createLinearGradient(0,y+h*0.28,0,y+h*0.86);
+    body.addColorStop(0,'hsl(214,9%,42%)'); body.addColorStop(1,'hsl(214,9%,24%)');
+    ctx.fillStyle=body;                                    // furnace body
+    roundRect(x+w*0.12,y+h*0.28,w*0.76,h*0.58,3); ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,.65)'; ctx.lineWidth=1.6; ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x+w*0.14,y+h*0.30); ctx.lineTo(x+w*0.86,y+h*0.30); ctx.stroke();
+    ctx.strokeStyle='rgba(0,0,0,.35)';                     // stone courses
+    ctx.beginPath(); ctx.moveTo(x+w*0.12,y+h*0.74); ctx.lineTo(x+w*0.88,y+h*0.74); ctx.stroke();
+    const mw=w*0.46, mTop=y+h*0.40, mBot=y+h*0.74;         // arched mouth
+    ctx.beginPath();
+    ctx.moveTo(cx2-mw/2,mBot); ctx.lineTo(cx2-mw/2,mTop+mw*0.22);
+    ctx.arc(cx2,mTop+mw*0.22,mw/2,Math.PI,0);
+    ctx.lineTo(cx2+mw/2,mBot); ctx.closePath();
+    ctx.fillStyle='#0b0705'; ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,.7)'; ctx.lineWidth=1.4; ctx.stroke();
+    ctx.save(); ctx.clip();                                // coals live inside
+    const bedY=mBot-h*0.05;
+    for(let i=0;i<7;i++){
+      const cxx=cx2-mw*0.40+i*mw*0.133, cyy=bedY-((i%2)?2.2:0);
+      const heat=0.55+0.45*Math.sin(t*4+i*1.7);
+      ctx.fillStyle=`hsl(${14+heat*24},95%,${34+heat*26}%)`;
+      ctx.beginPath(); ctx.ellipse(cxx,cyy,mw*0.085,h*0.035,0,0,7); ctx.fill();
+    }
+    const gl=ctx.createRadialGradient(cx2,bedY,1,cx2,bedY,mw*0.75);
+    gl.addColorStop(0,`rgba(255,${150+70*beat},70,${.55+.25*beat})`);
+    gl.addColorStop(1,'rgba(220,70,20,0)');
+    ctx.fillStyle=gl; ctx.fillRect(cx2-mw,mTop-h*0.1,mw*2,h*0.6);
+    ctx.restore();
+    ctx.fillStyle=`rgba(255,205,120,${.45+.35*beat})`;     // sparks up the flue
+    for(let i=0;i<4;i++){
+      const sx=cx2-w*0.06+((i*37)%12)*w*0.01;
+      ctx.beginPath(); ctx.arc(sx, y+h*0.30-((t*26+i*9)%18), 1.2, 0, 7); ctx.fill();
+    }
     break;}
   case 'anvil':{
     ctx.fillStyle='rgba(0,0,0,.32)';
@@ -1503,11 +1545,13 @@ function portalDir(toRoom){                 // -1 down, +1 up, 0 same level
   if(!a||!b) return 0;
   return Math.sign((b.floor||0)-(a.floor||0));
 }
-function wallSide(r,c){                     // which side of this cell is wall
-  const w=(rr,cc)=> rr<0||cc<0||rr>=ROWS||cc>=COLS||typeGrid[rr][cc]==='pit';
-  if(w(r-1,c)) return 'N'; if(w(r+1,c)) return 'S';
-  if(w(r,c-1)) return 'W'; if(w(r,c+1)) return 'E';
-  return 'N';
+/* Which way the wall through this square runs, so a door can sit in it the
+   way a door does: leaf parallel to the wall, you pass through crosswise. */
+function wallRun(r,c){
+  const w=(rr,cc)=> rr>=0&&cc>=0&&rr<ROWS&&cc<COLS&&typeGrid[rr][cc]==='pit';
+  const ns=(w(r-1,c)?1:0)+(w(r+1,c)?1:0);
+  const ew=(w(r,c-1)?1:0)+(w(r,c+1)?1:0);
+  return ns>ew?'NS' : ew>ns?'EW' : (ns?'NS':'EW');
 }
 function arrowGlyph(ctx2,x,y,s,up){
   ctx2.beginPath();
@@ -1565,8 +1609,8 @@ function drawPortal(p){
   case 'door': case 'secretdoor': {
     /* the architectural symbol: two jambs with a gap between them, the leaf
        swung open on its hinge, and a dashed arc showing the swing */
-    const side=wallSide(p.r,p.c), horiz=(side==='N'||side==='S');
-    ctx.save(); ctx.translate(cx2,cy2); if(!horiz) ctx.rotate(Math.PI/2);
+    ctx.save(); ctx.translate(cx2,cy2);
+    if(wallRun(p.r,p.c)==='NS') ctx.rotate(Math.PI/2);
     const span=CELL*0.86, gap=CELL*0.52, jamb=(span-gap)/2, th=CELL*0.13;
     const secret=p.kind==='secretdoor';
     /* jambs: stubs of wall either side of the opening */
@@ -3046,7 +3090,7 @@ function attachDrag(el, id){
 /* =============================== boot =============================== */
 window.VTT={ apply:applyBatch, state:()=>S, stateForGM,
   vis:()=>visGrid, light:()=>lightGrid, world:()=>WORLD,
-  glow:()=>({warm:glowWarm, cool:glowCool}) };
+  glow:()=>({warm:glowWarm, cool:glowCool}), wallRun };
 (async function boot(){
   let hashData=null;
   const m=location.hash.match(/#s=([A-Za-z0-9_-]+)/);

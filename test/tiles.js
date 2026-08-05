@@ -100,6 +100,21 @@ const KINDS = ['pillar','statue','altar','sarcophagus','brazier','forge','anvil'
     glow.atSource > glow.fiveAway && glow.fiveAway > glow.acrossRoom]);
   checks.push(['glow reaches nothing past the dim radius', glow.acrossRoom === 0]);
 
+  // a door must lie along the wall it sits in, whichever way that wall runs
+  const doors = await page.evaluate(() => {
+    window.VTT.apply({ do: 'scene', scene: { header: 'Doors', ground: 'stone',
+      rows: 7, cols: 7, ambient: 'bright',
+      zones: [{ from: 'A1', to: 'A7', type: 'wall' },   // wall running east-west
+               { from: 'C4', to: 'G4', type: 'wall' }], // wall running north-south
+      props: [{ kind: 'door', at: 'A3' }, { kind: 'door', at: 'E4' }, { kind: 'door', at: 'G7' }],
+      tokens: [], initiative: [] } });
+    return { inEW: window.VTT.wallRun(0, 2), inNS: window.VTT.wallRun(4, 3),
+      freeStanding: window.VTT.wallRun(6, 6) };
+  });
+  checks.push(['door in an east-west wall lies east-west', doors.inEW === 'EW']);
+  checks.push(['door in a north-south wall lies north-south', doors.inNS === 'NS']);
+  checks.push(['a free-standing door still has an orientation', !!doors.freeStanding]);
+
   let fail = 0;
   for (const [n, ok] of checks) { console.log((ok ? 'PASS' : 'FAIL') + '  ' + n); if (!ok) fail++; }
   console.log('page errors:', errs.length ? errs : 'none');
