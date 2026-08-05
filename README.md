@@ -13,7 +13,12 @@ off tokens, narration banners across the top.
   patches rather than per-tile static, plus eight hazard zones: water
   (depth-shaded, foams against the shore), rough, swamp, lava, ice, fog
   (translucent veil), darkness, and walls. Lamplight pools, glowing
-  hearths, and 13 drawn prop kinds. Grids up to 26×26, 5-ft squares.
+  hearths, and **56 drawn prop tiles** — pillars, statues, altars,
+  sarcophagi, braziers, forges, bookshelves, thrones, cages, webs,
+  summoning circles, trapdoors, spikes, wells, fountains, stalagmites,
+  crystals, market stalls, lampposts, fences, tents, campfires, logs and
+  more. Braziers and lampposts light the room; pillars and bookshelves
+  cast shadows. Grids up to 26×26, 5-ft squares.
 - **274 token icons + 26 condition badges** (game-icons.net, CC BY 3.0):
   heroes, townsfolk, undead, fey, giants, dragons, aberrations, beasts,
   sea life, dinosaurs, dungeon dressing — with per-kind styling
@@ -90,7 +95,8 @@ Everything is also scriptable from the page itself:
 | `test/smoke.js` | Playwright regression suite (31 checks) — `node test/smoke.js` |
 | `test/fow.js` | Fog of war / line of sight / light suite (24 checks) |
 | `test/world.js` | Room-to-room continuity suite (30 checks) |
-| `test/mega.js` | Mega-dungeon scale + portal art suite (12 checks) |
+| `test/mega.js` | Mega-dungeon scale + portal art suite (13 checks) |
+| `test/tiles.js` | Prop tiles, light emission and shadow casting (10 checks) |
 | `CLAUDE.md` | Briefing for Claude sessions run from this repo |
 
 ## Credits

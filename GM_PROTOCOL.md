@@ -70,7 +70,7 @@ still applies.
 | clearzones | `{"do":"clearzones","type":"dark"}` | `type` optional |
 | light | `{"do":"light","at":"G13","bright":20,"dim":40}` | Light source: bright to `bright` ft, dim to `dim` ft, occluded by walls. (Legacy `"rad"` in cells still works.) Hearths and 🔥 props light themselves. |
 | clearlights | `{"do":"clearlights"}` | |
-| prop | `{"do":"prop","kind":"barrel","at":"C3"}` | Kinds: tree pine rock table bar chair hearth barrel crate wagon haystack boat door — or `{"glyph":"🔥"}` |
+| prop | `{"do":"prop","kind":"brazier","at":"C3"}` | Scene dressing drawn on the map — full list below. `w`/`h` span cells; `"blocks":true/false` overrides whether it stops line of sight; or `{"glyph":"🔥"}` for any emoji |
 | unprop | `{"do":"unprop","at":"C3"}` | |
 | ground | `{"do":"ground","ground":"grass"}` | `stone` (flagstones) · `wood` · `shingle` · `grass` · `sand` · `dirt` · `snow` |
 | line | `{"do":"line","after":"E","label":"high tide"}` | Dashed rule below row E; omit `label` to remove |
@@ -79,6 +79,35 @@ still applies.
 | turn | `{"do":"turn","active":"Kira"}` | By initiative name or token |
 | next | `{"do":"next"}` | Advance; wraps to next round |
 | round | `{"do":"round","n":3}` | |
+
+## Props: the tiles you dress a map with
+
+`{"do":"prop","kind":"pillar","at":"C3"}`, or a `props` array in a scene.
+`w`/`h` make a prop span cells (a 2×1 table, a 3-cell fence run).
+
+**Dungeon** — pillar (column) · statue · altar · sarcophagus (coffin) ·
+brazier · forge · anvil · cauldron · chest · openchest · bookshelf · bed ·
+throne · cage · rubble · bones · web · runes · trapdoor · grate (drain) ·
+lever · plate (pressure plate) · spikes · well · fountain · rug (carpet) ·
+chains · door · table · bar · chair · barrel · crate
+
+**Cave** — stalagmite · crystal · pool · mushrooms
+
+**Town & camp** — stall · lamppost · fence · signpost · trough · sacks ·
+tent · campfire · wagon · haystack · boat
+
+**Wilderness** — tree · pine · bush · stump · log · reeds · rock
+
+Two behaviours come free:
+
+- **Light.** `brazier` `campfire` `hearth` `forge` `lamppost` `torch`
+  `candle` `crystal` `runes` and the 🔥 glyph feed the light grid — each
+  with its own bright/dim range in feet, occluded by walls like any other
+  light. Drop a brazier in a dark room and the room is lit.
+- **Sight.** `pillar` `statue` `stalagmite` `bookshelf` `tree` `pine`
+  `cage` `stall` `wagon` block line of sight and cast shadows. Add
+  `"blocks": true` to make anything else opaque (a stack of crates), or
+  `"blocks": false` to see past one that normally isn't.
 
 ## Scene schema
 

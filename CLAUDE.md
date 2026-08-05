@@ -33,7 +33,7 @@ repo root, then open `http://localhost:8000/`.
 - Grid refs are row-letter + column-number ("D7"); `normScene`/`normToken`
   convert external refs to internal 0-based `r`/`c`.
 - Verify with the regression suites: `node test/smoke.js`, `node test/fow.js`,
-  `node test/world.js` and `node test/mega.js`
+  `node test/world.js`, `node test/mega.js` and `node test/tiles.js`
   (need Playwright;
   preinstalled in Claude Code web sessions — `NODE_PATH=/opt/node22/lib/node_modules`
   if it isn't local). It serves the repo, drives `window.VTT.apply([...])`,
@@ -51,6 +51,10 @@ repo root, then open `http://localhost:8000/`.
   (ambient + sources, occluded by walls), shadowcasting FOV per viewer, then
   visibility = line of sight AND (lit OR within darkvision). Anything that
   moves a token, a light, or a wall must call `refreshFOW()`, not `repaint()`.
+- Props are painted by `drawProp`; `LIGHT_PROPS` decides which ones feed
+  `computeLight` (ranges in feet) and `SOLID_PROPS`/`propSolid` which ones
+  fill `solidGrid` and so block sight. Adding a prop kind means a `case` in
+  `drawProp` plus, if it glows or blocks, an entry in those tables.
 - Terrain painters live in `drawGround`/`drawWater`/`drawLava`/… and use
   `rnd(r,c,k)` for per-tile detail plus `macro(r,c)` for smooth
   low-frequency variation — use both so floors don't look like static.
