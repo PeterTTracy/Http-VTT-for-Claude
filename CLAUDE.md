@@ -32,13 +32,36 @@ repo root, then open `http://localhost:8000/`.
   persistence, and the GM log stay in sync.
 - Grid refs are row-letter + column-number ("D7"); `normScene`/`normToken`
   convert external refs to internal 0-based `r`/`c`.
-- Verify with the regression suite: `node test/smoke.js` (needs Playwright;
+- Verify with the regression suites: `node test/smoke.js`, `node test/fow.js`,
+  `node test/world.js`, `node test/mega.js` and `node test/tiles.js`
+  (need Playwright;
   preinstalled in Claude Code web sessions — `NODE_PATH=/opt/node22/lib/node_modules`
   if it isn't local). It serves the repo, drives `window.VTT.apply([...])`,
   asserts on `window.VTT.stateForGM()`, checks the board fits its viewport
   at phone and desktop sizes, and fails on any page error. Add a check when
   you add a command. Keep `node --check` passing on the extracted
   `<script>` body.
+- Multi-room worlds live in `WORLD` (rooms, links, pristine copies); `S` is
+  always the *current* room and points into `WORLD.rooms`. `WORLD` is null in
+  plain single-scene mode, and every code path must keep working in it.
+- Ways between rooms are drawn by `drawPortal`/`drawEdgePortal` from
+  `roomPortals()`, painted after markers but before `drawFOW` so fog hides
+  undiscovered exits. Up/down arrows come from the two rooms' `floor` values.
+- Fog of war lives in `computeLight`/`computeVision`/`drawFOW`: a light grid
+  (ambient + sources, occluded by walls), shadowcasting FOV per viewer, then
+  visibility = line of sight AND (lit OR within darkvision). Anything that
+  moves a token, a light, or a wall must call `refreshFOW()`, not `repaint()`.
+- Light from every source accumulates into `glowWarm`/`glowCool` in
+  `computeLight`, clamped to `S.maxLight` (default `GLOW_CAP_DEFAULT`), and
+  is painted by `drawGlow` from a one-pixel-per-cell canvas — never add a
+  per-source radial gradient back, that is what used to wash the board out.
+- Walls come in two forms that must stay equivalent for sight: the `pit`
+  zone type and the `wall`/`woodwall` props (via `solidGrid`). `blocksSight`
+  and `blocksView` consult both — change one, check the other.
+- Props are painted by `drawProp`; `LIGHT_PROPS` decides which ones feed
+  `computeLight` (ranges in feet) and `SOLID_PROPS`/`propSolid` which ones
+  fill `solidGrid` and so block sight. Adding a prop kind means a `case` in
+  `drawProp` plus, if it glows or blocks, an entry in those tables.
 - Terrain painters live in `drawGround`/`drawWater`/`drawLava`/… and use
   `rnd(r,c,k)` for per-tile detail plus `macro(r,c)` for smooth
   low-frequency variation — use both so floors don't look like static.

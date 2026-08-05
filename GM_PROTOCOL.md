@@ -41,7 +41,11 @@ still applies.
 
 | Command | Shape | Notes |
 |---|---|---|
-| scene | `{"do":"scene","scene":{…}}` | Replace the whole encounter (schema below) |
+| scene | `{"do":"scene","scene":{…}}` | Replace the whole encounter (schema below); leaves world mode |
+| world | `{"do":"world","world":{…}}` | Load a multi-room dungeon or settlement (see Worlds below) |
+| room | `{"do":"room","to":"cellar","at":"C6"}` | Move the party to another room; `at` optional |
+| link | `{"do":"link","from":{"room":"hall","at":"L7"},"to":{"room":"cellar","at":"C6"},"kind":"stairs","label":"down"}` | Join two rooms — or two map edges with `{"from":"a1","to":"a2","edge":"E"}`. `kind` draws the way out on the map: `stairs` `ladder` `door` `secretdoor` `gate` (portcullis) `vault` `portal` `hole` |
+| addroom | `{"do":"addroom","room":{…}}` | Add one room to a loaded world — build a mega-dungeon a wing at a time instead of pasting it all at once. `"replace":true` to overwrite; `"links":[…]` inside the room adds its connections |
 | title | `{"do":"title","header":"…","sub":"…"}` | Either field optional |
 | say | `{"do":"say","text":"…","tone":"danger"}` | Banner narration; tone: `info`/`danger`/`success` |
 | move | `{"do":"move","t":"K","to":"D7"}` | Animated; `"instant":true` to teleport |
@@ -59,11 +63,15 @@ still applies.
 | roll | `{"do":"roll","dice":"2d6+3","label":"club"}` | Rolls on the board and logs it; players also have a d4–d100 tray |
 | marker | `{"do":"marker","marker":{"shape":"circle","at":"F6","ft":10,"color":"purple","label":"web"}}` | Shapes: `circle` (radius ft), `cone` (length ft + `dir`), `line` (length ft + `dir` + width `w`), `square` (side ft, from top-left). `dir`: `N/NE/E/…` or degrees. Colors: red orange yellow green blue purple white. Same `id` replaces. |
 | unmark | `{"do":"unmark","id":"web"}` | Matches id or label; `{"do":"unmark"}` clears all |
-| zone | `{"do":"zone","from":"A1","to":"D16","type":"water"}` | Types: `water` (depth-shaded, foams at the shore) · `rough` · `swamp` · `lava` · `ice` · `fog` (translucent veil) · `dark` · `pit` (wall) |
+| wall | `{"do":"wall","from":"C3","to":"C9"}` | Lay a wall as a **run of squares** — the practical way to draw an irregular dungeon. `"kind"`: `wall` (stone) · `woodwall` (timber) · `lowwall` (ruined, cover only). `"remove":true` erases the same run. Straight or diagonal. |
+| zone | `{"do":"zone","from":"A1","to":"D16","type":"water"}` | Types: `water` (depth-shaded, foams at the shore) · `rough` · `swamp` · `lava` · `ice` · `fog` (translucent veil, blocks sight) · `dark` (magical darkness) · `wall` (blocks movement, sight and light; `pit` is the same thing) |
+| fow | `{"do":"fow","on":true}` | Fog of war master switch. Also `"ambient":"dark"`, `"reveal":"all"` (show the whole map), `"reset":true` (forget explored ground) |
+| ambient | `{"do":"ambient","light":"dark"}` | Scene light level: `bright` (daylight) · `dim` (dusk) · `dark` (night, dungeon). Also `"max":0.4` to set the glow ceiling (see below) |
+| vision | `{"do":"vision","t":"D","darkvision":60}` | Per-token sight. Also `{"vision":{"normal":30,"blind":true}}` and `"eyes":true/false` to add or drop a token from the party's shared view |
 | clearzones | `{"do":"clearzones","type":"dark"}` | `type` optional |
-| light | `{"do":"light","at":"G13","rad":2.5}` | Warm lamplight pool (radius in cells) |
+| light | `{"do":"light","at":"G13","bright":20,"dim":40}` | Light source: bright to `bright` ft, dim to `dim` ft, occluded by walls. (Legacy `"rad"` in cells still works.) Hearths and 🔥 props light themselves. |
 | clearlights | `{"do":"clearlights"}` | |
-| prop | `{"do":"prop","kind":"barrel","at":"C3"}` | Kinds: tree pine rock table bar chair hearth barrel crate wagon haystack boat door — or `{"glyph":"🔥"}` |
+| prop | `{"do":"prop","kind":"brazier","at":"C3"}` | Scene dressing drawn on the map — full list below. `w`/`h` span cells; `"blocks":true/false` overrides whether it stops line of sight; or `{"glyph":"🔥"}` for any emoji |
 | unprop | `{"do":"unprop","at":"C3"}` | |
 | ground | `{"do":"ground","ground":"grass"}` | `stone` (flagstones) · `wood` · `shingle` · `grass` · `sand` · `dirt` · `snow` |
 | line | `{"do":"line","after":"E","label":"high tide"}` | Dashed rule below row E; omit `label` to remove |
@@ -72,6 +80,54 @@ still applies.
 | turn | `{"do":"turn","active":"Kira"}` | By initiative name or token |
 | next | `{"do":"next"}` | Advance; wraps to next round |
 | round | `{"do":"round","n":3}` | |
+
+## Props: the tiles you dress a map with
+
+`{"do":"prop","kind":"pillar","at":"C3"}`, or a `props` array in a scene.
+`w`/`h` make a prop span cells (a 2×1 table, a 3-cell fence run).
+
+**Walls** — wall · woodwall · lowwall. Placed objects rather than shaded
+regions, so an irregular dungeon is a handful of runs instead of a stack
+of rectangles. Stone and timber walls stop movement, sight *and* light,
+and are drawn with lit faces and shadows falling onto the floor beside
+them. A `lowwall` is a ruined, waist-high wall: cover you can see over.
+Punch a doorway by removing one square and dropping a `door` prop in it.
+(The `wall` **zone** type still exists and behaves identically for LOS —
+use it when a whole rectangle really is solid rock.)
+
+**Dungeon** — pillar (column) · statue · altar · sarcophagus (coffin) ·
+brazier · forge · anvil · cauldron · chest · openchest · bookshelf · bed ·
+throne · cage · rubble · bones · web · runes · trapdoor · grate (drain) ·
+lever · plate (pressure plate) · spikes · well · fountain · rug (carpet) ·
+chains · door · table · bar · chair · barrel · crate
+
+**Cave** — stalagmite · crystal · pool · mushrooms
+
+**Town & camp** — stall · lamppost · fence · signpost · trough · sacks ·
+tent · campfire · wagon · haystack · boat
+
+**Wilderness** — tree · pine · bush · stump · log · reeds · rock
+
+Two behaviours come free:
+
+- **Light.** `brazier` `campfire` `hearth` `forge` `lamppost` `torch`
+  `candle` `crystal` `runes` and the 🔥 glyph feed the light grid — each
+  with its own bright/dim range in feet, occluded by walls like any other
+  light. Drop a brazier in a dark room and the room is lit. Crystals and
+  runes glow violet rather than firelight.
+
+  Every source adds to one accumulated glow that is **capped**, so a hall
+  of twenty braziers reads as a lit hall instead of a white page. The
+  ceiling is `0.85` by default; set `"maxLight": 0.4` on a scene (or send
+  `{"do":"ambient","max":0.4}`) to keep a torchlit room moodier, or `1`
+  to let it blaze. Daylight scenes damp the glow automatically — a lantern
+  at noon barely shows. Past 80 sources the extra ones are ignored and the
+  board says so in its log.
+- **Sight.** `wall` `woodwall` `pillar` `statue` `stalagmite` `bookshelf`
+  `tree` `pine` `cage` `stall` `wagon` block line of sight and cast
+  shadows (and stop light, so a torch will not shine through them). Add
+  `"blocks": true` to make anything else opaque (a stack of crates), or
+  `"blocks": false` to see past one that normally isn't.
 
 ## Scene schema
 
@@ -99,7 +155,132 @@ Token fields: `kind` is `pc` | `ally` | `foe` | `mark`; `size` 1–3 squares
 cur = max) or `{cur,max}`; `icon` any id from `TOKENS_index.md` (without the
 `tk-` prefix); `conds` up to 3 condition ids (with or without the `c-`
 prefix); `aura` `{ft,color}`; `hidden: true` to stage it off-board until
-you `reveal` it.
+you `reveal` it; `vision` `{dark, normal, blind}` (or `darkvision: 60`) and
+`eyes` to control whose eyes the board renders from.
+
+## Worlds: dungeons and settlements across many rooms
+
+A single scene is one grid, capped at 26×26. A **world** is a set of named
+rooms — each a full scene — joined by links, which is how you build a
+dungeon larger than one grid, a keep with cellars and towers, or a town the
+party keeps coming back to.
+
+Every room keeps its **own** tokens, initiative, markers and fog memory. Leave
+and return and you find it exactly as you left it: the wounded rat still
+wounded, the ground you explored still explored. Party tokens (`pc`/`ally`,
+or anything with `"party": true`) travel with the group; everything else
+stays where it lives.
+
+```json
+{"do":"world","world":{
+  "name":"Greyhold Keep","start":"hall",
+  "rooms":[
+    {"id":"hall","name":"Great Hall","floor":0,"ground":"stone","rows":14,"cols":14,
+     "ambient":"dim","fow":true,
+     "props":[{"kind":"hearth","at":"D7"}],
+     "tokens":[{"id":"K","name":"Kira","at":"J7","kind":"pc","icon":"swordwoman","hp":24,
+                "vision":{"dark":60}}],
+     "initiative":[{"name":"Kira 16","t":"K"}]},
+    {"id":"yard","name":"East Yard","floor":0,"ground":"dirt","rows":14,"cols":14,
+     "ambient":"bright","tokens":[{"id":"gd","name":"Guard","at":"G4","kind":"foe","icon":"watch","hp":16}]},
+    {"id":"cellar","name":"Cellar","floor":-1,"ground":"stone","rows":12,"cols":12,
+     "ambient":"dark","fow":true,
+     "tokens":[{"id":"gh","name":"Ghoul","at":"J8","kind":"foe","icon":"ghoul","hp":18}]}],
+  "links":[
+    {"from":"hall","to":"yard","edge":"E"},
+    {"from":{"room":"hall","at":"L7"},"to":{"room":"cellar","at":"C6"},
+     "kind":"stairs","label":"down"}]}}
+```
+
+**Ways in and out are drawn where they are.** Each link that touches the
+current room is painted on its square — a stair with its run of steps, a
+ladder's rungs, a door drawn as the architectural symbol —
+jambs, swung leaf, swing arc — a portcullis with spiked feet, a bolted
+vault door, a rune-lit portal, a hole — captioned with where it goes and an ▲/▼ taken
+from the two rooms' floors, so a stair down *looks* like a stair down (its
+far end falls into darkness; an upward one climbs into light). The square
+lights up gold when a party member is standing on it. Edge links get
+chevrons marching off that edge with the next room named beside them.
+Portals are drawn under the fog of war, so the party only sees the exits
+they have actually found.
+
+**Two kinds of link:**
+
+- **Cell links** join one square to another: a door, a stair, a ladder, a
+  portal. `{"from":{"room":"hall","at":"L7"},"to":{"room":"cellar","at":"C6"},"kind":"stairs","label":"down"}`.
+  `kind` picks the marker (`door` `stairs` `ladder` `gate` `portal`), `label`
+  is free text and is inverted automatically from the far side — a stair
+  labelled "down" reads "up" when you're below.
+- **Edge links** join a whole map edge to the opposite edge of the next room:
+  `{"from":"a1","to":"a2","edge":"E"}`. Walk off the east edge of `a1` and you
+  arrive against the west edge of `a2` on the same row. This is how you tile
+  a big map: a 48×48 dungeon is four 24×24 rooms edge-linked in a square.
+
+Links are two-way unless you set `"both": false`.
+
+**Moving the party:** `{"do":"room","to":"cellar"}` (optionally `"at":"C6"`)
+takes everyone through. At the table the players do it themselves — the
+footer shows the room's exits, greyed out until a party member is standing
+on the door or stair, then lit and tappable. Travellers arrive at the
+entry square and spread into the free squares around it, and are added to
+the new room's turn order if they aren't in it.
+
+**Building at mega-dungeon scale.** A world can hold as many rooms as you
+like — a 27-room, three-floor cavern builds in about a quarter of a second
+and serializes to ~30 KB. You do not have to send it in one message:
+open with `world` and one room, then `addroom` a wing at a time as the
+party pushes deeper, which is also how you keep a Wave Echo Cave or a
+Ravenloft manor manageable in chat. The 🗺 button opens an overview
+grouping every room by floor, lighting the ones the party has visited and
+ringing the one they are in.
+
+`{"do":"link", …}` adds a link to a loaded world (secret doors found later).
+`stateForGM` reports `world`, `room`, `floor` and the current `exits`, each
+flagged `partyIsHere` when someone is standing on it — so you always know
+where the party is and what leads out.
+
+Sending a plain `scene` command leaves world mode and goes back to a single
+board.
+
+## Fog of war, line of sight & light
+
+Turn it on per scene with `"fow": true` (or `{"do":"fow","on":true}`) and set
+the scene's `"ambient"` light. The board then shows the players only what
+their party can actually see:
+
+- **Line of sight** is computed by shadowcasting from every viewer — by
+  default all `pc` and `ally` tokens. `wall` zones block sight and light;
+  `fog` zones are heavy obscurement (you see the fog, not what's beyond).
+- **Light** comes from `ambient` plus every light source, each occluded by
+  walls. A cell is bright, dim, or dark. Hearth props light themselves.
+- **Darkvision** (`{"do":"vision","t":"D","darkvision":60}`) lets a token
+  see darkness as dim light out to that range. Magical darkness (`dark`
+  zones) defeats it — that's the difference between a `dark` zone and an
+  unlit room.
+- **Memory**: ground the party has seen stays on the map, dimmed. Creatures
+  in it do not — an enemy that walks out of sight disappears until seen
+  again. Unexplored ground is black.
+- Enemy tokens are only rendered when the party can see them, so with fog
+  on you *can* place foes in advance; they stay invisible until the light
+  or the party reaches them. `stateForGM` marks them `"unseen": true`.
+- `{"do":"fow","reveal":"all"}` opens the whole map (end of a dungeon,
+  or a divination); `{"do":"fow","reset":true}` forgets explored ground;
+  `{"do":"fow","on":false}` turns the whole system off.
+
+A dark-dungeon opening looks like:
+
+```json
+[{"do":"scene","scene":{
+   "header":"Barrow of the Pale King","ground":"stone","rows":16,"cols":16,
+   "ambient":"dark","fow":true,
+   "zones":[{"from":"H6","to":"H12","type":"wall"}],
+   "props":[{"kind":"hearth","at":"D9"}],
+   "tokens":[
+     {"id":"D","name":"Dain","at":"E12","kind":"pc","icon":"dwarf","hp":30,"vision":{"dark":60}},
+     {"id":"B","name":"Bren","at":"F11","kind":"pc","icon":"wizard","hp":26},
+     {"id":"g1","name":"Ghoul","at":"J8","kind":"foe","icon":"ghoul","hp":18}]}},
+ {"do":"say","text":"Your torch gutters. Something shifts in the dark ahead.","tone":"danger"}]
+```
 
 ## GM practices
 
