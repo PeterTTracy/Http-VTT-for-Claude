@@ -41,7 +41,10 @@ still applies.
 
 | Command | Shape | Notes |
 |---|---|---|
-| scene | `{"do":"scene","scene":{…}}` | Replace the whole encounter (schema below) |
+| scene | `{"do":"scene","scene":{…}}` | Replace the whole encounter (schema below); leaves world mode |
+| world | `{"do":"world","world":{…}}` | Load a multi-room dungeon or settlement (see Worlds below) |
+| room | `{"do":"room","to":"cellar","at":"C6"}` | Move the party to another room; `at` optional |
+| link | `{"do":"link","from":{"room":"hall","at":"L7"},"to":{"room":"cellar","at":"C6"},"kind":"stairs","label":"down"}` | Join two rooms — or two map edges with `{"from":"a1","to":"a2","edge":"E"}` |
 | title | `{"do":"title","header":"…","sub":"…"}` | Either field optional |
 | say | `{"do":"say","text":"…","tone":"danger"}` | Banner narration; tone: `info`/`danger`/`success` |
 | move | `{"do":"move","t":"K","to":"D7"}` | Animated; `"instant":true` to teleport |
@@ -104,6 +107,69 @@ cur = max) or `{cur,max}`; `icon` any id from `TOKENS_index.md` (without the
 prefix); `aura` `{ft,color}`; `hidden: true` to stage it off-board until
 you `reveal` it; `vision` `{dark, normal, blind}` (or `darkvision: 60`) and
 `eyes` to control whose eyes the board renders from.
+
+## Worlds: dungeons and settlements across many rooms
+
+A single scene is one grid, capped at 26×26. A **world** is a set of named
+rooms — each a full scene — joined by links, which is how you build a
+dungeon larger than one grid, a keep with cellars and towers, or a town the
+party keeps coming back to.
+
+Every room keeps its **own** tokens, initiative, markers and fog memory. Leave
+and return and you find it exactly as you left it: the wounded rat still
+wounded, the ground you explored still explored. Party tokens (`pc`/`ally`,
+or anything with `"party": true`) travel with the group; everything else
+stays where it lives.
+
+```json
+{"do":"world","world":{
+  "name":"Greyhold Keep","start":"hall",
+  "rooms":[
+    {"id":"hall","name":"Great Hall","floor":0,"ground":"stone","rows":14,"cols":14,
+     "ambient":"dim","fow":true,
+     "props":[{"kind":"hearth","at":"D7"}],
+     "tokens":[{"id":"K","name":"Kira","at":"J7","kind":"pc","icon":"swordwoman","hp":24,
+                "vision":{"dark":60}}],
+     "initiative":[{"name":"Kira 16","t":"K"}]},
+    {"id":"yard","name":"East Yard","floor":0,"ground":"dirt","rows":14,"cols":14,
+     "ambient":"bright","tokens":[{"id":"gd","name":"Guard","at":"G4","kind":"foe","icon":"watch","hp":16}]},
+    {"id":"cellar","name":"Cellar","floor":-1,"ground":"stone","rows":12,"cols":12,
+     "ambient":"dark","fow":true,
+     "tokens":[{"id":"gh","name":"Ghoul","at":"J8","kind":"foe","icon":"ghoul","hp":18}]}],
+  "links":[
+    {"from":"hall","to":"yard","edge":"E"},
+    {"from":{"room":"hall","at":"L7"},"to":{"room":"cellar","at":"C6"},
+     "kind":"stairs","label":"down"}]}}
+```
+
+**Two kinds of link:**
+
+- **Cell links** join one square to another: a door, a stair, a ladder, a
+  portal. `{"from":{"room":"hall","at":"L7"},"to":{"room":"cellar","at":"C6"},"kind":"stairs","label":"down"}`.
+  `kind` picks the marker (`door` `stairs` `ladder` `gate` `portal`), `label`
+  is free text and is inverted automatically from the far side — a stair
+  labelled "down" reads "up" when you're below.
+- **Edge links** join a whole map edge to the opposite edge of the next room:
+  `{"from":"a1","to":"a2","edge":"E"}`. Walk off the east edge of `a1` and you
+  arrive against the west edge of `a2` on the same row. This is how you tile
+  a big map: a 48×48 dungeon is four 24×24 rooms edge-linked in a square.
+
+Links are two-way unless you set `"both": false`.
+
+**Moving the party:** `{"do":"room","to":"cellar"}` (optionally `"at":"C6"`)
+takes everyone through. At the table the players do it themselves — the
+footer shows the room's exits, greyed out until a party member is standing
+on the door or stair, then lit and tappable. Travellers arrive at the
+entry square and spread into the free squares around it, and are added to
+the new room's turn order if they aren't in it.
+
+`{"do":"link", …}` adds a link to a loaded world (secret doors found later).
+`stateForGM` reports `world`, `room`, `floor` and the current `exits`, each
+flagged `partyIsHere` when someone is standing on it — so you always know
+where the party is and what leads out.
+
+Sending a plain `scene` command leaves world mode and goes back to a single
+board.
 
 ## Fog of war, line of sight & light
 

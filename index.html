@@ -156,6 +156,14 @@
     letter-spacing:.1em; color:var(--dim)}
   .key{width:100%; text-align:center}
   .dicerow{display:flex; gap:6px; flex-wrap:wrap; justify-content:center; width:100%}
+  .exits{display:flex; gap:6px; flex-wrap:wrap; align-items:center; justify-content:center;
+    width:min(96vw,860px); margin-top:8px; font-family:ui-monospace,monospace; font-size:11px}
+  .exits .here{color:var(--lamp); letter-spacing:.08em; text-transform:uppercase;
+    margin-right:4px; font-size:10.5px}
+  .exits .exit{opacity:.45}
+  .exits .exit i{color:var(--dim); font-style:normal}
+  .exits .exit.ready{opacity:1; border-color:var(--lamp); color:var(--lamp)}
+  .exits .exit.ready i{color:var(--lamp)}
   @media (max-width:520px){
     body{padding:10px 4px 22px}
     .init{flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start;
@@ -212,6 +220,7 @@
   </div>
   <ul id="gmlog"></ul>
 </div>
+<div class="exits" id="exits" hidden></div>
 <div class="foot">
   <div class="measure" id="measure">drag a token to measure</div>
   <button class="btn" id="dice" title="dice roller">🎲</button>
@@ -328,6 +337,7 @@ function normToken(t){
     st:t.st||null, conds:(t.conds||[]).map(normCond).slice(0,3),
     aura:t.aura&&t.aura.ft?{ft:t.aura.ft, color:t.aura.color||'blue'}:null,
     hidden:!!t.hidden,
+    party:t.party,
     eyes:t.eyes,
     vision:normVision(t)};
 }
@@ -1183,7 +1193,7 @@ function buildBoard(){
   }
   for(const tk of S.tokens) makeTokenEl(tk);
   rebuildTypeGrid(); computeVision(); applyTokenVisibility(); repaint();
-  renderHeader(); renderChips(); renderLegend();
+  renderHeader(); renderChips(); renderLegend(); renderExits();
   sizeViewport();
 }
 function renderHeader(){ $('h-title').textContent=S.header; $('h-sub').textContent=S.sub; }
@@ -1274,6 +1284,7 @@ function moveTok(tk,to,instant){
     place(el,tk); pulse(el);
   }
   if(S.fow.on) refreshFOW(); else if(S.tokens.some(x=>x.aura)) repaint();
+  if(WORLD&&isParty(tk)) renderExits();
   return `${tk.name} → ${refOf(tk.r,tk.c)}`;
 }
 function applyCmd(cmd){
@@ -1385,6 +1396,16 @@ function applyCmd(cmd){
   case 'next': advanceTurn();
     return `turn: ${S.initiative[S.active]?.name||'—'} (R${S.round})`;
   case 'round': S.round=cmd.n||1; renderChips(); return 'round '+S.round;
+  case 'world': return 'world → '+loadWorld(cmd.world||cmd).name;
+  case 'room': case 'goto': {
+    const id=String(cmd.to||cmd.room||'');
+    const at=cmd.at!==undefined?parseRef(cmd.at):null;
+    const room=enterRoom(id, at, cmd.quiet);
+    return 'entered '+room.name; }
+  case 'link': {
+    if(!WORLD) throw 'no world loaded — send a "world" command first';
+    WORLD.links.push(normLink(cmd.link||cmd));
+    renderExits(); save(); return 'link added'; }
   case 'fow': case 'fog_of_war': {
     if(cmd.on!==undefined) S.fow.on=!!cmd.on;
     if(cmd.ambient) S.fow.ambient=cmd.ambient;
@@ -1526,31 +1547,235 @@ async function stDel(k){
 let saveTimer=null;
 function save(){
   clearTimeout(saveTimer);
-  saveTimer=setTimeout(()=>stSet(SKEY,
-    JSON.stringify({v:5, s:S, s0:S0, feedSeq})), 300);
+  saveTimer=setTimeout(()=>stSet(SKEY, JSON.stringify(
+    WORLD ? {v:6, w:WORLD, feedSeq} : {v:6, s:S, s0:S0, feedSeq})), 300);
 }
 async function tryRestore(){
   try{
     const raw=await stGet(SKEY); if(!raw) return;
     const st=JSON.parse(raw);
-    if(!st||st.v!==5||!st.s||!st.s.tokens) return;
-    S=st.s; if(st.s0) S0=st.s0;
-    S.fow=S.fow||{on:false, ambient:'bright', seen:null};   // pre-fow sessions
+    if(!st||st.v!==6) return;
+    if(st.w && st.w.rooms && st.w.rooms[st.w.current]){
+      WORLD=st.w; S=WORLD.rooms[WORLD.current]; S0=WORLD.pristine[WORLD.current]||deep(S);
+    } else if(st.s && st.s.tokens){
+      WORLD=null; S=st.s; if(st.s0) S0=st.s0;
+    } else return;
+    S.fow=S.fow||{on:false, ambient:'bright', seen:null};
     feedSeq=st.feedSeq||0;
     buildBoard();
   }catch(e){}
 }
 
+/* ======================= world: many rooms, one dungeon =======================
+   A world is a set of named rooms (each a full scene) plus the links between
+   them. Every room keeps its own tokens, initiative, markers and fog memory,
+   so leaving and coming back finds it exactly as you left it — that is what
+   makes a settlement or a multi-level dungeon feel continuous.
+
+   Party tokens (pc/ally by default, or "party": true) travel with the group:
+   they leave the room you exit and arrive in the room you enter, carrying
+   HP, conditions and gear. Everything else stays where it lives.
+
+   Links come in two flavours:
+     cell links  a door or stair on one square joins a square in another room
+     edge links  a whole map edge joins the opposite edge of the next room,
+                 which is how a dungeon bigger than one grid is tiled together
+   Both are one-way unless "both" (the default for doors and stairs). */
+let WORLD=null;                       // null = plain single-scene mode
+const EDGES={N:'S', S:'N', E:'W', W:'E'};
+function normLink(L){
+  const lk={kind:L.kind||'door', label:L.label||'', both:L.both!==false};
+  if(L.edge){                     // edge link: {from:"a1", to:"a2", edge:"E"}
+    lk.edge=String(L.edge).toUpperCase();
+    lk.from=String(L.from); lk.to=String(L.to);
+    if(!EDGES[lk.edge]) throw `bad edge "${L.edge}" (want N, S, E or WORLD)`;
+    lk.kind=L.kind||'edge';
+    return lk;
+  }
+  const f=L.from, t=L.to;         // cell link: {from:{room,at}, to:{room,at}}
+  if(!f||!t||!f.room||!t.room) throw 'link wants from/to {room, at} or an edge';
+  lk.from={room:String(f.room), ...parseRef(f.at)};
+  lk.to={room:String(t.room), ...parseRef(t.at)};
+  return lk;
+}
+function normWorld(inp){
+  const w=inp.world||inp;
+  const rooms={};
+  const list=Array.isArray(w.rooms)?w.rooms
+    :Object.entries(w.rooms||{}).map(([id,r])=>({id, ...r}));
+  if(!list.length) throw 'a world needs at least one room';
+  for(const r of list){
+    const id=String(r.id||r.name||('room'+Object.keys(rooms).length));
+    rooms[id]=normScene(r);
+    rooms[id].id=id;
+    rooms[id].name=r.name||rooms[id].header;
+    rooms[id].floor=r.floor??0;
+  }
+  return {name:w.name||'Dungeon', rooms,
+    links:(w.links||[]).map(normLink),
+    pristine:deep(rooms),
+    current:String(w.start||w.current||list[0].id||Object.keys(rooms)[0])};
+}
+const isParty=tk=> tk.party!==undefined ? !!tk.party : (tk.kind==='pc'||tk.kind==='ally');
+/* the link a party member standing on (r,c) could walk through */
+function linkAt(r,c){
+  if(!WORLD) return null;
+  const here=WORLD.current;
+  for(const L of WORLD.links){
+    if(L.edge){
+      const on = L.edge==='N'?r===0 : L.edge==='S'?r===ROWS-1
+               : L.edge==='W'?c===0 : c===COLS-1;
+      if(L.from===here && on)
+        return {to:L.to, at:edgeArrival(L.edge,r,c,L.to), kind:L.kind,
+          label:L.label||EDGE_NAME[L.edge], key:'e'+L.to+L.edge};
+      const back = L.edge==='N'?r===ROWS-1 : L.edge==='S'?r===0
+                 : L.edge==='W'?c===COLS-1 : c===0;
+      if(L.both && L.to===here && back)
+        return {to:L.from, at:edgeArrival(EDGES[L.edge],r,c,L.from), kind:L.kind,
+          label:L.label||EDGE_NAME[EDGES[L.edge]], key:'e'+L.from+L.edge};
+    } else {
+      if(L.from.room===here && L.from.r===r && L.from.c===c)
+        return {to:L.to.room, at:{r:L.to.r, c:L.to.c}, kind:L.kind, label:L.label,
+          key:'c'+L.to.room+L.to.r+','+L.to.c};
+      if(L.both && L.to.room===here && L.to.r===r && L.to.c===c)
+        return {to:L.from.room, at:{r:L.from.r, c:L.from.c}, kind:L.kind,
+          label:revLabel(L.label), key:'c'+L.from.room+L.from.r+','+L.from.c};
+    }
+  }
+  return null;
+}
+/* walking off one edge arrives against the opposite edge of the next room,
+   holding the same row (or column), clamped to that room's size */
+function edgeArrival(edge,r,c,destId){
+  const t=WORLD.rooms[destId]||S;
+  const rr=clamp(r,0,t.rows-1), cc=clamp(c,0,t.cols-1);
+  return edge==='N'?{r:t.rows-1, c:cc} : edge==='S'?{r:0, c:cc}
+       : edge==='W'?{r:rr, c:t.cols-1} : {r:rr, c:0};
+}
+/* nearest free square to (r,c) in the room we're arriving in */
+function freeCellNear(room,r,c,taken){
+  const fits=(rr,cc)=> rr>=0&&cc>=0&&rr<room.rows&&cc<room.cols &&
+    !taken.has(rr+','+cc) &&
+    !room.zones.some(z=>z.type==='pit'&&rr>=z.r1&&rr<=z.r2&&cc>=z.c1&&cc<=z.c2);
+  if(fits(r,c)) return {r,c};
+  for(let ring=1;ring<Math.max(room.rows,room.cols);ring++)
+    for(let dr=-ring;dr<=ring;dr++)for(let dc=-ring;dc<=ring;dc++){
+      if(Math.max(Math.abs(dr),Math.abs(dc))!==ring) continue;
+      if(fits(r+dr,c+dc)) return {r:r+dr, c:c+dc};
+    }
+  return {r:clamp(r,0,room.rows-1), c:clamp(c,0,room.cols-1)};
+}
+function enterRoom(id,at,quiet){
+  if(!WORLD) throw 'no world loaded — send a "world" command first';
+  const dest=WORLD.rooms[id];
+  if(!dest) throw `no room "${id}" (have: ${Object.keys(WORLD.rooms).join(', ')})`;
+  const from=WORLD.rooms[WORLD.current];
+  let party=[];
+  if(from && from!==dest){
+    party=from.tokens.filter(isParty);
+    from.tokens=from.tokens.filter(t=>!isParty(t));
+    from.initiative=from.initiative.filter(e=>!party.some(p=>p.id===e.t));
+  }
+  WORLD.current=id;
+  /* drop travellers in, spreading around the arrival square */
+  const taken=new Set(dest.tokens.map(t=>t.r+','+t.c));
+  const anchor=at||{r:0,c:0};
+  for(const tk of party){
+    const spot=freeCellNear(dest, anchor.r, anchor.c, taken);
+    tk.r=spot.r; tk.c=spot.c; taken.add(spot.r+','+spot.c);
+    dest.tokens=dest.tokens.filter(t=>t.id!==tk.id);
+    dest.tokens.push(tk);
+    if(!dest.initiative.some(e=>e.t===tk.id))
+      dest.initiative.push({name:tk.name, detail:'', kind:tk.kind, t:tk.id});
+  }
+  S=dest; S0=WORLD.pristine[id];
+  buildBoard(); save();
+  if(!quiet) banner(`${dest.name}${dest.floor?`  ·  floor ${dest.floor}`:''}`, 'success');
+  return dest;
+}
+function loadWorld(inp){
+  WORLD=normWorld(inp);
+  const cur=WORLD.rooms[WORLD.current];
+  S=cur; S0=WORLD.pristine[WORLD.current];
+  buildBoard(); save();
+  return cur;
+}
+/* exits the party can currently walk through, for the footer strip */
+function currentExits(){
+  if(!WORLD) return [];
+  const out=[], seen=new Set(), standing=new Map();
+  for(const t of S.tokens){
+    if(!isParty(t)) continue;
+    const l=linkAt(t.r,t.c);
+    if(l) standing.set(l.key, l.at);      // where this traveller would come out
+  }
+  const add=(to,kind,label,key,at)=>{
+    if(seen.has(key)) return; seen.add(key);
+    out.push({to, kind, label, key, at:standing.get(key)||at, ready:standing.has(key)});
+  };
+  for(const L of WORLD.links){
+    if(L.edge){
+      if(L.from===WORLD.current)
+        add(L.to, L.kind, L.label||EDGE_NAME[L.edge], 'e'+L.to+L.edge, null);
+      else if(L.both&&L.to===WORLD.current)
+        add(L.from, L.kind, L.label||EDGE_NAME[EDGES[L.edge]], 'e'+L.from+L.edge, null);
+    } else {
+      if(L.from.room===WORLD.current)
+        add(L.to.room, L.kind, L.label, 'c'+L.to.room+L.to.r+','+L.to.c, {r:L.to.r,c:L.to.c});
+      else if(L.both&&L.to.room===WORLD.current)
+        add(L.from.room, L.kind, revLabel(L.label), 'c'+L.from.room+L.from.r+','+L.from.c,
+          {r:L.from.r,c:L.from.c});
+    }
+  }
+  return out;
+}
+const EDGE_NAME={N:'north', S:'south', E:'east', W:'west'};
+/* a stair labelled "down" is labelled "up" from the other end */
+const REV_LABEL={down:'up', up:'down', in:'out', out:'in', over:'under', under:'over',
+  north:'south', south:'north', east:'west', west:'east'};
+const revLabel=l=> l?(REV_LABEL[String(l).toLowerCase()]||l):'';
+const KIND_MARK={door:'🚪', stairs:'⇕', edge:'▸', gate:'⛩', ladder:'⇕', portal:'✦'};
+function renderExits(){
+  const bar=$('exits');
+  if(!WORLD){ bar.hidden=true; bar.innerHTML=''; return; }
+  const ex=currentExits();
+  const room=WORLD.rooms[WORLD.current];
+  bar.hidden=false;
+  bar.innerHTML=`<span class="here">${room.name}${room.floor?` · floor ${room.floor}`:''}</span>`+
+    ex.map(e=>{
+      const dest=WORLD.rooms[e.to];
+      return `<button class="btn exit${e.ready?' ready':''}" data-to="${e.to}"
+        data-r="${e.at?e.at.r:-1}" data-c="${e.at?e.at.c:-1}"
+        title="${e.ready?'a party member is standing here':'walk a party token onto the '+(e.label||'exit')+' to use it'}"
+        >${KIND_MARK[e.kind]||'▸'} ${dest?dest.name:e.to}${e.label?` <i>(${e.label})</i>`:''}</button>`;
+    }).join('');
+}
+$('exits').addEventListener('click',e=>{
+  const b=e.target.closest('.exit'); if(!b) return;
+  if(!b.classList.contains('ready')){
+    banner('Walk a party token onto that door or stair first.','');
+    return;
+  }
+  const at=+b.dataset.r>=0?{r:+b.dataset.r, c:+b.dataset.c}:null;
+  try{ enterRoom(b.dataset.to, at); }
+  catch(err){ logLine('✗ '+err,'err'); }
+});
+
 /* =============================== scene lifecycle =============================== */
 function loadScene(inp){
+  WORLD=null;
   S=normScene(inp); S0=deep(S);
   buildBoard(); save();
 }
-function restoreState(st){ S=st; buildBoard(); save(); }
+function restoreState(st){
+  S=st;
+  if(WORLD) WORLD.rooms[WORLD.current]=st;
+  buildBoard(); save();
+}
 $('reset').addEventListener('click',async()=>{
   await stDel(SKEY);
   restoreState(deep(S0));
-  logLine('↺ scene reset to starting state');
+  logLine(WORLD?`↺ ${S.name} reset to its starting state`:'↺ scene reset to starting state');
 });
 
 /* =============================== GM console =============================== */
@@ -1569,8 +1794,13 @@ $('gmapply').addEventListener('click',()=>{
   }catch(err){ logLine('✗ '+(typeof err==='string'?err:err.message),'err'); }
 });
 function stateForGM(){
+  const ex=currentExits();
   return {
     scene:S.header, round:S.round,
+    ...(WORLD?{world:WORLD.name, room:WORLD.current,
+      ...(S.floor?{floor:S.floor}:{}),
+      exits:ex.map(e=>({to:e.to, kind:e.kind, ...(e.label?{label:e.label}:{}),
+        ...(e.ready?{partyIsHere:true}:{})}))}:{}),
     turn:S.initiative[S.active]?.name||null,
     tokens:S.tokens.map(tk=>({id:tk.id, name:tk.name, at:refOf(tk.r,tk.c),
       ...(tk.hp?{hp:tk.hp.cur+'/'+tk.hp.max}:{}),
@@ -1768,7 +1998,9 @@ function attachDrag(el, id){
     const c=clamp(pc-dragTok.offC, 0, COLS-tk.size);
     const r=clamp(pr-dragTok.offR, 0, ROWS-tk.size);
     const ty=typeGrid[r][c];
-    measure.textContent=`${tk.label}: ${refOf(dragTok.r0,dragTok.c0)} → ${refOf(r,c)} · ${feet(dragTok.r0,dragTok.c0,r,c)} ft${HAZARD[ty]||''}`;
+    const lk=isParty(tk)?linkAt(r,c):null;
+    measure.textContent=`${tk.label}: ${refOf(dragTok.r0,dragTok.c0)} → ${refOf(r,c)} · ${feet(dragTok.r0,dragTok.c0,r,c)} ft${HAZARD[ty]||''}`+
+      (lk?`  ▸ ${WORLD.rooms[lk.to]?WORLD.rooms[lk.to].name:lk.to}`:'');
     dragTok.r=r; dragTok.c=c;
   });
   el.addEventListener('pointerup', e=>{
@@ -1778,6 +2010,7 @@ function attachDrag(el, id){
     tk.r=dragTok.r??dragTok.r0; tk.c=dragTok.c??dragTok.c0;
     el.classList.remove('dragging'); place(el,tk); dragTok=null;
     if(S.fow.on) refreshFOW(); else if(tk.aura) repaint();
+    if(WORLD&&isParty(tk)) renderExits();
     if(!moved){
       const now=Date.now();
       if(now-(el._tap||0)<300){ cycleToken(tk); el._tap=0; }
