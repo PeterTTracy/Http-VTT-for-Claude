@@ -76,6 +76,30 @@ const KINDS = ['pillar','statue','altar','sarcophagus','brazier','forge','anvil'
   });
   checks.push(['"blocks":true makes any prop opaque', ov <= 0]);
 
+  // the lighting ceiling: many sources must not stack past the cap
+  const glow = await page.evaluate(() => {
+    const many = [];
+    for (let r = 0; r < 14; r += 2) for (let c = 0; c < 14; c += 2)
+      many.push({ kind: 'brazier', at: String.fromCharCode(65 + r) + (c + 1) });
+    window.VTT.apply({ do: 'scene', scene: { header: 'Cap', ground: 'stone',
+      rows: 14, cols: 14, ambient: 'dark', props: many, tokens: [], initiative: [] } });
+    const peak = Math.max(...window.VTT.glow().warm.flat());
+    window.VTT.apply({ do: 'ambient', max: 0.3 });
+    const dialled = Math.max(...window.VTT.glow().warm.flat());
+    window.VTT.apply({ do: 'scene', scene: { header: 'One', ground: 'stone',
+      rows: 14, cols: 14, ambient: 'dark',
+      props: [{ kind: 'brazier', at: 'G7' }], tokens: [], initiative: [] } });
+    const g = window.VTT.glow().warm;
+    return { sources: many.length, peak, dialled,
+      atSource: g[6][6], fiveAway: g[6][11], acrossRoom: g[0][0] };
+  });
+  checks.push([`${glow.sources} light sources clamp to the 0.85 ceiling`,
+    Math.abs(glow.peak - 0.85) < 1e-9]);
+  checks.push(['"max" dials the ceiling down', Math.abs(glow.dialled - 0.3) < 1e-9]);
+  checks.push(['a lone light still falls off with distance',
+    glow.atSource > glow.fiveAway && glow.fiveAway > glow.acrossRoom]);
+  checks.push(['glow reaches nothing past the dim radius', glow.acrossRoom === 0]);
+
   let fail = 0;
   for (const [n, ok] of checks) { console.log((ok ? 'PASS' : 'FAIL') + '  ' + n); if (!ok) fail++; }
   console.log('page errors:', errs.length ? errs : 'none');

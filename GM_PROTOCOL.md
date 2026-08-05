@@ -65,7 +65,7 @@ still applies.
 | unmark | `{"do":"unmark","id":"web"}` | Matches id or label; `{"do":"unmark"}` clears all |
 | zone | `{"do":"zone","from":"A1","to":"D16","type":"water"}` | Types: `water` (depth-shaded, foams at the shore) · `rough` · `swamp` · `lava` · `ice` · `fog` (translucent veil, blocks sight) · `dark` (magical darkness) · `wall` (blocks movement, sight and light; `pit` is the same thing) |
 | fow | `{"do":"fow","on":true}` | Fog of war master switch. Also `"ambient":"dark"`, `"reveal":"all"` (show the whole map), `"reset":true` (forget explored ground) |
-| ambient | `{"do":"ambient","light":"dark"}` | Scene light level: `bright` (daylight) · `dim` (dusk) · `dark` (night, dungeon) |
+| ambient | `{"do":"ambient","light":"dark"}` | Scene light level: `bright` (daylight) · `dim` (dusk) · `dark` (night, dungeon). Also `"max":0.4` to set the glow ceiling (see below) |
 | vision | `{"do":"vision","t":"D","darkvision":60}` | Per-token sight. Also `{"vision":{"normal":30,"blind":true}}` and `"eyes":true/false` to add or drop a token from the party's shared view |
 | clearzones | `{"do":"clearzones","type":"dark"}` | `type` optional |
 | light | `{"do":"light","at":"G13","bright":20,"dim":40}` | Light source: bright to `bright` ft, dim to `dim` ft, occluded by walls. (Legacy `"rad"` in cells still works.) Hearths and 🔥 props light themselves. |
@@ -103,7 +103,16 @@ Two behaviours come free:
 - **Light.** `brazier` `campfire` `hearth` `forge` `lamppost` `torch`
   `candle` `crystal` `runes` and the 🔥 glyph feed the light grid — each
   with its own bright/dim range in feet, occluded by walls like any other
-  light. Drop a brazier in a dark room and the room is lit.
+  light. Drop a brazier in a dark room and the room is lit. Crystals and
+  runes glow violet rather than firelight.
+
+  Every source adds to one accumulated glow that is **capped**, so a hall
+  of twenty braziers reads as a lit hall instead of a white page. The
+  ceiling is `0.85` by default; set `"maxLight": 0.4` on a scene (or send
+  `{"do":"ambient","max":0.4}`) to keep a torchlit room moodier, or `1`
+  to let it blaze. Daylight scenes damp the glow automatically — a lantern
+  at noon barely shows. Past 80 sources the extra ones are ignored and the
+  board says so in its log.
 - **Sight.** `pillar` `statue` `stalagmite` `bookshelf` `tree` `pine`
   `cage` `stall` `wagon` block line of sight and cast shadows. Add
   `"blocks": true` to make anything else opaque (a stack of crates), or

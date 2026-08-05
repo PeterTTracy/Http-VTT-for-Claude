@@ -51,6 +51,10 @@ repo root, then open `http://localhost:8000/`.
   (ambient + sources, occluded by walls), shadowcasting FOV per viewer, then
   visibility = line of sight AND (lit OR within darkvision). Anything that
   moves a token, a light, or a wall must call `refreshFOW()`, not `repaint()`.
+- Light from every source accumulates into `glowWarm`/`glowCool` in
+  `computeLight`, clamped to `S.maxLight` (default `GLOW_CAP_DEFAULT`), and
+  is painted by `drawGlow` from a one-pixel-per-cell canvas — never add a
+  per-source radial gradient back, that is what used to wash the board out.
 - Props are painted by `drawProp`; `LIGHT_PROPS` decides which ones feed
   `computeLight` (ranges in feet) and `SOLID_PROPS`/`propSolid` which ones
   fill `solidGrid` and so block sight. Adding a prop kind means a `case` in
