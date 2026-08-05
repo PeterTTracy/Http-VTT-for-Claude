@@ -115,6 +115,40 @@ const KINDS = ['pillar','statue','altar','sarcophagus','brazier','forge','anvil'
   checks.push(['door in a north-south wall lies north-south', doors.inNS === 'NS']);
   checks.push(['a free-standing door still has an orientation', !!doors.freeStanding]);
 
+  // walls as objects: runs, occlusion, cover, and erasing
+  const walls = await page.evaluate(() => {
+    window.VTT.apply([
+      { do: 'scene', scene: { header: 'Walls', ground: 'stone', rows: 12, cols: 12,
+        ambient: 'dark', fow: true,
+        tokens: [{ id: 'K', name: 'K', at: 'F6', kind: 'pc', hp: 10, vision: { dark: 90 } }],
+        initiative: [] } },
+      { do: 'wall', from: 'C3', to: 'C9' },              // stone run north of the token
+      { do: 'wall', from: 'I3', to: 'I9', kind: 'lowwall' },   // low run south of it
+      { do: 'wall', from: 'F10', to: 'F10', kind: 'woodwall' }]);
+    const V = window.VTT.vis(), at = ref => V[ref.charCodeAt(0) - 65][+ref.slice(1) - 1];
+    const isWall = q => ['wall', 'woodwall', 'lowwall'].includes(q.kind);
+    return { count: window.VTT.state().props.filter(isWall).length,
+      wallFace: at('C6'), beyondWall: at('A6'),
+      lowFace: at('I6'), beyondLow: at('K6'),
+      timber: at('F10'), beyondTimber: at('F12') };
+  });
+  checks.push(['a wall run lays one square per cell', walls.count === 7 + 7 + 1]);
+  checks.push(['the wall face is visible', walls.wallFace > 0]);
+  checks.push(['a stone wall blocks sight beyond it', walls.beyondWall <= 0]);
+  checks.push(['a low wall is visible', walls.lowFace > 0]);
+  checks.push(['a low wall is cover, not a sight blocker', walls.beyondLow > 0]);
+  checks.push(['a timber wall blocks sight beyond it', walls.beyondTimber <= 0]);
+
+  const erased = await page.evaluate(() => {
+    const before = window.VTT.state().props.length;
+    window.VTT.apply({ do: 'wall', from: 'C3', to: 'C9', remove: true });
+    const V = window.VTT.vis();
+    return { removed: before - window.VTT.state().props.length,
+      nowVisible: V[0][5] };   // A6, previously behind the wall
+  });
+  checks.push(['removing a run erases exactly its squares', erased.removed === 7]);
+  checks.push(['sight opens up once the wall is gone', erased.nowVisible > 0]);
+
   let fail = 0;
   for (const [n, ok] of checks) { console.log((ok ? 'PASS' : 'FAIL') + '  ' + n); if (!ok) fail++; }
   console.log('page errors:', errs.length ? errs : 'none');

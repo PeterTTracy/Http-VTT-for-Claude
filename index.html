@@ -890,6 +890,91 @@ function drawProp(p,t){
     ctx.restore();
     break;}
 
+  /* ------------------------------- walls -------------------------------
+     Walls as objects you place, rather than rectangles you shade. A solid
+     one stops movement, sight and light; a low one is cover you can see
+     over. Faces are drawn against whichever sides are open, so a run reads
+     as a wall rather than a row of blocks. */
+  case 'wall': case 'woodwall': case 'lowwall':{
+    const open=(rr,cc)=>{
+      if(rr<0||cc<0||rr>=ROWS||cc>=COLS) return true;
+      return !S.props.some(q=>['wall','woodwall','lowwall'].includes(q.kind)
+        && rr>=q.r && rr<q.r+(q.h||1) && cc>=q.c && cc<q.c+(q.w||1));
+    };
+    const low=p.kind==='lowwall', wood=p.kind==='woodwall';
+    const inset=low?CELL*0.16:0;
+    const X=x+inset, Y=y+inset, WW=w-inset*2, HH=h-inset*2;
+    if(wood){
+      ctx.fillStyle='hsl(26,24%,15%)'; ctx.fillRect(X,Y,WW,HH);
+      const n=Math.max(3,Math.round(WW/9));
+      for(let i=0;i<n;i++){
+        const px=X+WW*i/n, pw=WW/n-1;
+        ctx.fillStyle=`hsl(${25+rnd(p.r,p.c,i)*8},26%,${22+rnd(p.r,p.c,i+9)*10}%)`;
+        ctx.fillRect(px,Y,pw,HH);
+        ctx.fillStyle='rgba(255,225,180,.07)'; ctx.fillRect(px,Y,1.4,HH);
+        ctx.fillStyle='rgba(0,0,0,.4)'; ctx.fillRect(px+pw-1,Y,1,HH);
+        if(rnd(p.r,p.c,i+30)>.55){ ctx.fillStyle='hsl(210,8%,45%)';
+          ctx.beginPath(); ctx.arc(px+pw/2,Y+HH*0.22,1.1,0,7); ctx.fill();
+          ctx.beginPath(); ctx.arc(px+pw/2,Y+HH*0.78,1.1,0,7); ctx.fill(); }
+      }
+    } else {
+      ctx.fillStyle=low?'hsl(216,10%,14%)':'hsl(216,12%,11%)';
+      ctx.fillRect(X,Y,WW,HH);
+      const bh=Math.max(8,HH/(low?2:3));                  // coursed masonry
+      for(let row=0, by=Y; by<Y+HH-0.5; row++, by+=bh){
+        const off=(row%2)?bh*0.55:0, hh=Math.min(bh,Y+HH-by);
+        for(let bx=X-bh; bx<X+WW; bx+=bh*1.15){
+          const px=Math.max(X,bx+off), pw=Math.min(bx+off+bh*1.15-2,X+WW)-px;
+          if(pw<=1) continue;
+          ctx.fillStyle=`hsl(${212+rnd(p.r,p.c,row*7+bx)*10},${low?8:10}%,${
+            (low?20:24)+rnd(p.r,p.c,row*3+bx)*(low?7:9)}%)`;
+          ctx.fillRect(px,by,pw,hh-1.6);
+          ctx.fillStyle='rgba(255,255,255,.055)'; ctx.fillRect(px,by,pw,1.4);
+          ctx.fillStyle='rgba(0,0,0,.30)'; ctx.fillRect(px,by+hh-2.6,pw,1);
+        }
+      }
+    }
+    /* shade the faces that meet open floor so runs read as walls */
+    const faces=[[open(p.r-1,p.c),'N'],[open(p.r+(p.h||1),p.c),'S'],
+                 [open(p.r,p.c-1),'W'],[open(p.r,p.c+(p.w||1)),'E']];
+    for(const [isOpen,side] of faces){
+      if(!isOpen) continue;
+      const t2=Math.min(7,CELL*0.13);
+      const g2=side==='N'?ctx.createLinearGradient(0,Y,0,Y+t2)
+        :side==='S'?ctx.createLinearGradient(0,Y+HH,0,Y+HH-t2)
+        :side==='W'?ctx.createLinearGradient(X,0,X+t2,0)
+        :ctx.createLinearGradient(X+WW,0,X+WW-t2,0);
+      g2.addColorStop(0,'rgba(255,255,255,.10)'); g2.addColorStop(1,'rgba(255,255,255,0)');
+      ctx.fillStyle=g2;
+      if(side==='N') ctx.fillRect(X,Y,WW,t2);
+      else if(side==='S') ctx.fillRect(X,Y+HH-t2,WW,t2);
+      else if(side==='W') ctx.fillRect(X,Y,t2,HH);
+      else ctx.fillRect(X+WW-t2,Y,t2,HH);
+      /* and drop a shadow onto the floor beyond */
+      const sh=Math.min(9,CELL*0.16);
+      const g3=side==='N'?ctx.createLinearGradient(0,Y,0,Y-sh)
+        :side==='S'?ctx.createLinearGradient(0,Y+HH,0,Y+HH+sh)
+        :side==='W'?ctx.createLinearGradient(X,0,X-sh,0)
+        :ctx.createLinearGradient(X+WW,0,X+WW+sh,0);
+      g3.addColorStop(0,'rgba(0,0,0,.45)'); g3.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g3;
+      if(side==='N') ctx.fillRect(X,Y-sh,WW,sh);
+      else if(side==='S') ctx.fillRect(X,Y+HH,WW,sh);
+      else if(side==='W') ctx.fillRect(X-sh,Y,sh,HH);
+      else ctx.fillRect(X+WW,Y,sh,HH);
+    }
+    if(low){                                   // broken top course + rubble
+      ctx.strokeStyle='rgba(0,0,0,.5)'; ctx.lineWidth=1.2;
+      ctx.strokeRect(X+.5,Y+.5,WW-1,HH-1);
+      for(let i=0;i<4;i++){
+        ctx.fillStyle=`hsl(214,7%,${28+rnd(p.r,p.c,i+50)*10}%)`;
+        ctx.beginPath();
+        ctx.arc(X+WW*(0.15+rnd(p.r,p.c,i)*0.7), Y+HH*(0.1+rnd(p.r,p.c,i+5)*0.15),
+          1.6+rnd(p.r,p.c,i+11)*1.6, 0, 7); ctx.fill();
+      }
+    }
+    break;}
+
   /* ------------------------------ dungeon ------------------------------ */
   case 'pillar': case 'column':{
     const R=Math.min(w,h)*0.30;
@@ -1526,8 +1611,8 @@ function drawProp(p,t){
 const LIGHT_PROPS={hearth:[20,40], brazier:[20,40], campfire:[25,50], forge:[15,30],
   lamppost:[25,50], torch:[20,40], candle:[5,10], crystal:[10,20], runes:[5,15]};
 /* props you cannot see through */
-const SOLID_PROPS=new Set(['pillar','column','statue','stalagmite','bookshelf',
-  'tree','pine','cage','stall','wagon']);
+const SOLID_PROPS=new Set(['wall','woodwall','pillar','column','statue','stalagmite',
+  'bookshelf','tree','pine','cage','stall','wagon']);
 const propLight=p=> p.glyph==='🔥'?[20,40]:LIGHT_PROPS[p.kind]||null;
 const propSolid=p=> p.blocks!==undefined ? !!p.blocks : SOLID_PROPS.has(p.kind);
 /* ---------------------------- portals on the map ----------------------------
@@ -2411,6 +2496,33 @@ function applyCmd(cmd){
     const at=cmd.at!==undefined?parseRef(cmd.at):null;
     const room=enterRoom(id, at, cmd.quiet);
     return 'entered '+room.name; }
+  case 'wall': case 'walls': {
+    /* Draw a wall as a run of squares rather than a rectangle to shade:
+       {"do":"wall","from":"C3","to":"C9"} lays a corridor side in one go.
+       "remove":true erases the same run. */
+    const a=parseRef(cmd.from), b=parseRef(cmd.to!==undefined?cmd.to:cmd.from);
+    const kind=['wall','woodwall','lowwall'].includes(cmd.kind)?cmd.kind:'wall';
+    const dr=b.r-a.r, dc=b.c-a.c;
+    const steps=Math.max(Math.abs(dr),Math.abs(dc));
+    const cells=[];
+    for(let i=0;i<=steps;i++){
+      const r=Math.round(a.r+(dr*i)/(steps||1)), c=Math.round(a.c+(dc*i)/(steps||1));
+      if(r>=0&&c>=0&&r<ROWS&&c<COLS) cells.push({r,c});
+    }
+    const isWall=q=>['wall','woodwall','lowwall'].includes(q.kind);
+    if(cmd.remove){
+      const before=S.props.length;
+      S.props=S.props.filter(q=>!(isWall(q)&&cells.some(e=>e.r===q.r&&e.c===q.c)));
+      rebuildTypeGrid(); refreshFOW();
+      return `removed ${before-S.props.length} wall squares`;
+    }
+    let added=0;
+    for(const e of cells){
+      if(S.props.some(q=>isWall(q)&&q.r===e.r&&q.c===e.c)) continue;
+      S.props.push({kind, r:e.r, c:e.c}); added++;
+    }
+    rebuildTypeGrid(); refreshFOW();
+    return `${kind} ×${added} from ${refOf(a.r,a.c)} to ${refOf(b.r,b.c)}`; }
   case 'addroom': case 'room_add': {
     if(!WORLD) throw 'no world loaded — send a "world" command first';
     const r=cmd.room||cmd;
@@ -3065,7 +3177,8 @@ function attachDrag(el, id){
     const r=clamp(pr-dragTok.offR, 0, ROWS-tk.size);
     const ty=typeGrid[r][c];
     const lk=isParty(tk)?linkAt(r,c):null;
-    measure.textContent=`${tk.label}: ${refOf(dragTok.r0,dragTok.c0)} → ${refOf(r,c)} · ${feet(dragTok.r0,dragTok.c0,r,c)} ft${HAZARD[ty]||''}`+
+    const blocked=solidGrid[r]&&solidGrid[r][c]&&ty!=='pit';
+    measure.textContent=`${tk.label}: ${refOf(dragTok.r0,dragTok.c0)} → ${refOf(r,c)} · ${feet(dragTok.r0,dragTok.c0,r,c)} ft${HAZARD[ty]||(blocked?' (blocked)':'')}`+
       (lk?`  ▸ ${WORLD.rooms[lk.to]?WORLD.rooms[lk.to].name:lk.to}`:'');
     dragTok.r=r; dragTok.c=c;
   });

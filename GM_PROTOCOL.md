@@ -63,6 +63,7 @@ still applies.
 | roll | `{"do":"roll","dice":"2d6+3","label":"club"}` | Rolls on the board and logs it; players also have a d4–d100 tray |
 | marker | `{"do":"marker","marker":{"shape":"circle","at":"F6","ft":10,"color":"purple","label":"web"}}` | Shapes: `circle` (radius ft), `cone` (length ft + `dir`), `line` (length ft + `dir` + width `w`), `square` (side ft, from top-left). `dir`: `N/NE/E/…` or degrees. Colors: red orange yellow green blue purple white. Same `id` replaces. |
 | unmark | `{"do":"unmark","id":"web"}` | Matches id or label; `{"do":"unmark"}` clears all |
+| wall | `{"do":"wall","from":"C3","to":"C9"}` | Lay a wall as a **run of squares** — the practical way to draw an irregular dungeon. `"kind"`: `wall` (stone) · `woodwall` (timber) · `lowwall` (ruined, cover only). `"remove":true` erases the same run. Straight or diagonal. |
 | zone | `{"do":"zone","from":"A1","to":"D16","type":"water"}` | Types: `water` (depth-shaded, foams at the shore) · `rough` · `swamp` · `lava` · `ice` · `fog` (translucent veil, blocks sight) · `dark` (magical darkness) · `wall` (blocks movement, sight and light; `pit` is the same thing) |
 | fow | `{"do":"fow","on":true}` | Fog of war master switch. Also `"ambient":"dark"`, `"reveal":"all"` (show the whole map), `"reset":true` (forget explored ground) |
 | ambient | `{"do":"ambient","light":"dark"}` | Scene light level: `bright` (daylight) · `dim` (dusk) · `dark` (night, dungeon). Also `"max":0.4` to set the glow ceiling (see below) |
@@ -84,6 +85,15 @@ still applies.
 
 `{"do":"prop","kind":"pillar","at":"C3"}`, or a `props` array in a scene.
 `w`/`h` make a prop span cells (a 2×1 table, a 3-cell fence run).
+
+**Walls** — wall · woodwall · lowwall. Placed objects rather than shaded
+regions, so an irregular dungeon is a handful of runs instead of a stack
+of rectangles. Stone and timber walls stop movement, sight *and* light,
+and are drawn with lit faces and shadows falling onto the floor beside
+them. A `lowwall` is a ruined, waist-high wall: cover you can see over.
+Punch a doorway by removing one square and dropping a `door` prop in it.
+(The `wall` **zone** type still exists and behaves identically for LOS —
+use it when a whole rectangle really is solid rock.)
 
 **Dungeon** — pillar (column) · statue · altar · sarcophagus (coffin) ·
 brazier · forge · anvil · cauldron · chest · openchest · bookshelf · bed ·
@@ -113,8 +123,9 @@ Two behaviours come free:
   to let it blaze. Daylight scenes damp the glow automatically — a lantern
   at noon barely shows. Past 80 sources the extra ones are ignored and the
   board says so in its log.
-- **Sight.** `pillar` `statue` `stalagmite` `bookshelf` `tree` `pine`
-  `cage` `stall` `wagon` block line of sight and cast shadows. Add
+- **Sight.** `wall` `woodwall` `pillar` `statue` `stalagmite` `bookshelf`
+  `tree` `pine` `cage` `stall` `wagon` block line of sight and cast
+  shadows (and stop light, so a torch will not shine through them). Add
   `"blocks": true` to make anything else opaque (a stack of crates), or
   `"blocks": false` to see past one that normally isn't.
 

@@ -55,6 +55,9 @@ repo root, then open `http://localhost:8000/`.
   `computeLight`, clamped to `S.maxLight` (default `GLOW_CAP_DEFAULT`), and
   is painted by `drawGlow` from a one-pixel-per-cell canvas — never add a
   per-source radial gradient back, that is what used to wash the board out.
+- Walls come in two forms that must stay equivalent for sight: the `pit`
+  zone type and the `wall`/`woodwall` props (via `solidGrid`). `blocksSight`
+  and `blocksView` consult both — change one, check the other.
 - Props are painted by `drawProp`; `LIGHT_PROPS` decides which ones feed
   `computeLight` (ranges in feet) and `SOLID_PROPS`/`propSolid` which ones
   fill `solidGrid` and so block sight. Adding a prop kind means a `case` in

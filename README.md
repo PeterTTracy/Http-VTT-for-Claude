@@ -96,7 +96,7 @@ Everything is also scriptable from the page itself:
 | `test/fow.js` | Fog of war / line of sight / light suite (24 checks) |
 | `test/world.js` | Room-to-room continuity suite (30 checks) |
 | `test/mega.js` | Mega-dungeon scale + portal art suite (13 checks) |
-| `test/tiles.js` | Prop tiles, light emission, shadow casting, glow ceiling (13 checks) |
+| `test/tiles.js` | Prop tiles, light, shadows, glow ceiling, walls (25 checks) |
 | `CLAUDE.md` | Briefing for Claude sessions run from this repo |
 
 ## Credits
