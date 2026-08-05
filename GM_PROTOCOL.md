@@ -52,15 +52,20 @@ still applies.
 | cond | `{"do":"cond","t":"K","add":["prone"],"remove":["frightened"]}` | `"remove":"all"` clears; max 3 shown |
 | spawn | `{"do":"spawn","token":{…},"init":{"after":2}}` | Token schema below; `init` optionally inserts an initiative chip |
 | remove | `{"do":"remove","t":"sa"}` | Also drops its initiative chip |
+| hide | `{"do":"hide","t":"amb"}` | Token leaves the board but keeps its state — stage ambushes with `"hidden":true` and reveal on the round they strike |
+| reveal | `{"do":"reveal","t":"amb","at":"F9"}` | `at` optional (reveals in place); pulses on arrival |
+| aura | `{"do":"aura","t":"K","ft":10,"color":"blue"}` | Radius that follows the token (auras, torchlight, dragon breath range); `ft:0` clears |
+| ping | `{"do":"ping","at":"F9"}` | Expanding ring — "look here" |
+| roll | `{"do":"roll","dice":"2d6+3","label":"club"}` | Rolls on the board and logs it; players also have a d4–d100 tray |
 | marker | `{"do":"marker","marker":{"shape":"circle","at":"F6","ft":10,"color":"purple","label":"web"}}` | Shapes: `circle` (radius ft), `cone` (length ft + `dir`), `line` (length ft + `dir` + width `w`), `square` (side ft, from top-left). `dir`: `N/NE/E/…` or degrees. Colors: red orange yellow green blue purple white. Same `id` replaces. |
 | unmark | `{"do":"unmark","id":"web"}` | Matches id or label; `{"do":"unmark"}` clears all |
-| zone | `{"do":"zone","from":"A1","to":"D16","type":"water"}` | Types: `water` `rough` `dark` `pit` (wall) |
+| zone | `{"do":"zone","from":"A1","to":"D16","type":"water"}` | Types: `water` (depth-shaded, foams at the shore) · `rough` · `swamp` · `lava` · `ice` · `fog` (translucent veil) · `dark` · `pit` (wall) |
 | clearzones | `{"do":"clearzones","type":"dark"}` | `type` optional |
 | light | `{"do":"light","at":"G13","rad":2.5}` | Warm lamplight pool (radius in cells) |
 | clearlights | `{"do":"clearlights"}` | |
 | prop | `{"do":"prop","kind":"barrel","at":"C3"}` | Kinds: tree pine rock table bar chair hearth barrel crate wagon haystack boat door — or `{"glyph":"🔥"}` |
 | unprop | `{"do":"unprop","at":"C3"}` | |
-| ground | `{"do":"ground","ground":"grass"}` | wood shingle stone grass sand |
+| ground | `{"do":"ground","ground":"grass"}` | `stone` (flagstones) · `wood` · `shingle` · `grass` · `sand` · `dirt` · `snow` |
 | line | `{"do":"line","after":"E","label":"high tide"}` | Dashed rule below row E; omit `label` to remove |
 | legend | `{"do":"legend","legend":[["~ water","#6fa9ad"]]}` | |
 | init | `{"do":"init","order":[{"name":"Kira 19","t":"K"}]}` | Replace turn order; `t` links a chip to a token so it shows live HP |
@@ -92,14 +97,19 @@ still applies.
 Token fields: `kind` is `pc` | `ally` | `foe` | `mark`; `size` 1–3 squares
 (Large 2, Huge 3 — `at` is the top-left square); `hp` a number (means
 cur = max) or `{cur,max}`; `icon` any id from `TOKENS_index.md` (without the
-`tk-` prefix); `conds` up to 3 condition ids (with or without the `c-` prefix).
+`tk-` prefix); `conds` up to 3 condition ids (with or without the `c-`
+prefix); `aura` `{ft,color}`; `hidden: true` to stage it off-board until
+you `reveal` it.
 
 ## GM practices
 
 - **Batch a whole turn** into one array — narration first (`say`), then
   moves, damage, conditions, then `next`. One paste per turn keeps play fast.
-- **Don't stage secrets.** The board is fully visible to players; keep the
-  hidden ogre in your notes and `spawn` it on the round it appears.
+- **Stage secrets with `hidden`.** Put the ambushers in the scene with
+  `"hidden": true` and `reveal` them when they strike — their HP and
+  position are already tracked, so the reveal is one command. (Anything
+  visible on the board is visible to the players, so don't rely on a token
+  simply being unremarkable.)
 - **Ask for state** whenever players have acted on the board (dragged
   tokens, edited HP in the inspector) before you narrate consequences.
 - The board enforces nothing but grid bounds — rules, cover, and legality

@@ -32,8 +32,13 @@ repo root, then open `http://localhost:8000/`.
   persistence, and the GM log stay in sync.
 - Grid refs are row-letter + column-number ("D7"); `normScene`/`normToken`
   convert external refs to internal 0-based `r`/`c`.
-- Verify changes in headless Chromium (Playwright is preinstalled in Claude
-  Code web sessions): load the page over local HTTP, drive
-  `window.VTT.apply([...])`, assert on `window.VTT.stateForGM()`, and check
-  for zero page errors. Keep `node --check` passing on the extracted
+- Verify with the regression suite: `node test/smoke.js` (needs Playwright;
+  preinstalled in Claude Code web sessions — `NODE_PATH=/opt/node22/lib/node_modules`
+  if it isn't local). It serves the repo, drives `window.VTT.apply([...])`,
+  asserts on `window.VTT.stateForGM()`, checks the board fits its viewport
+  at phone and desktop sizes, and fails on any page error. Add a check when
+  you add a command. Keep `node --check` passing on the extracted
   `<script>` body.
+- Terrain painters live in `drawGround`/`drawWater`/`drawLava`/… and use
+  `rnd(r,c,k)` for per-tile detail plus `macro(r,c)` for smooth
+  low-frequency variation — use both so floors don't look like static.

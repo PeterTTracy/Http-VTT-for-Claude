@@ -8,18 +8,26 @@ off tokens, narration banners across the top.
 
 ## What's on the board
 
-- **Canvas-rendered terrain** — wood / shingle / stone / grass / sand
-  floors, animated water, difficult-terrain hatching, walls, darkness,
-  lamplight pools, glowing hearths, and 13 drawn prop kinds (trees, boats,
-  tables, barrels…). Grids up to 26×26, 5-ft squares.
-- **~200 embedded token icons** (game-icons.net, CC BY 3.0) with
-  per-kind styling (pc / ally / foe / mark), Large & Huge sizes, HP bars,
-  wound states, and up to 3 condition badges per token.
-- **Play aids** — drag-to-measure in feet with difficult-terrain warnings,
-  initiative chips that show live HP for linked tokens, round counter,
-  spell/AoE markers (circle · cone · line · square), pinch-zoom and pan.
+- **Canvas-rendered terrain** — seven floors (flagstone, wood, shingle,
+  grass, sand, dirt, snow) with low-frequency variation so ground reads as
+  patches rather than per-tile static, plus eight hazard zones: water
+  (depth-shaded, foams against the shore), rough, swamp, lava, ice, fog
+  (translucent veil), darkness, and walls. Lamplight pools, glowing
+  hearths, and 13 drawn prop kinds. Grids up to 26×26, 5-ft squares.
+- **274 token icons + 26 condition badges** (game-icons.net, CC BY 3.0):
+  heroes, townsfolk, undead, fey, giants, dragons, aberrations, beasts,
+  sea life, dinosaurs, dungeon dressing — with per-kind styling
+  (pc / ally / foe / mark), Large & Huge sizes, HP bars, wound and down
+  states, auras, and up to 3 condition badges per token.
+- **Play aids** — drag-to-measure in feet with per-hazard warnings, a
+  persistent ring on whoever's turn it is, initiative chips showing live HP,
+  round counter, spell/AoE markers (circle · cone · line · square), token
+  auras, GM pings, a d4–d100 dice tray, pinch-zoom and pan.
 - **A tap-to-inspect panel** — select any token to edit HP and toggle
   conditions at the table without asking the GM.
+- **Phone-first layout** — the whole board fits the screen at rest (no
+  clipping at any size), the initiative rail scrolls horizontally, touch
+  targets are sized for thumbs, and it scales up cleanly to desktop.
 - **Persistence** — the session survives reloads (localStorage, or
   `window.storage` when hosted as a claude.ai artifact); ↺ reset restores
   the encounter's starting state; ↩ undo reverts the last GM batch.
@@ -65,6 +73,7 @@ Everything is also scriptable from the page itself:
 | `index.html` | The whole product — engine, styles, icon sprite |
 | `GM_PROTOCOL.md` | The JSON command language a Claude GM speaks |
 | `TOKENS_index.md` | Icon & condition id reference |
+| `test/smoke.js` | Playwright regression suite (31 checks) — `node test/smoke.js` |
 | `CLAUDE.md` | Briefing for Claude sessions run from this repo |
 
 ## Credits
