@@ -57,9 +57,11 @@ off tokens, narration banners across the top.
   crypt tiles, marble, planks, ruined floor, cave, dirt, mud, grass, ash
   waste, boneyard, sand, snow, shingle), fourteen terrain zones including
   solid rock, chasm, blight and consecrated ground, a Gravelands prop set
-  (headstones, open graves, mausoleums, gibbets, pyres, sigils) and **22
+  (headstones, open graves, mausoleums, gibbets, pyres, sigils) and **36
   pixel-art portrait tokens** (skeleton, ghoul, wraith, death knight, lich,
-  vampire, cultist, crusader, priest, rogue, wizard, ranger and more) with
+  vampire, cultist, crusader, priest, rogue, wizard, ranger, goblin, kobold,
+  bandit, barbarian, bard, monk, druid, wolf, dragon, mummy, ghost, demon,
+  mimic, eyebeast and more) with
   seven metal frames. No image files, no external art, nothing to license.
 - **✎ Build tab.** Paint floors and terrain with a 1/2/3 brush, stamp
   props, drop portrait or icon tokens with HP/AC, erase, resize, set light,
@@ -69,6 +71,11 @@ off tokens, narration banners across the top.
   a boneyard, a sunken crypt (rooms carved from rock, fog of war, dark), a
   ruined chapel, a cellular-automata cave, a road ambush, a village square
   and a frozen mere. Every one is checked so everybody can reach everybody.
+- **Light you carry and the mood of the hour.** Give any token a torch,
+  lantern, candle, sunrod or a glow (🔥 in the inspector) and its light moves
+  with it, lifting fog of war as it goes. Ten moods colour-grade the map:
+  dawn, day, dusk, night, firelit, eerie, blood moon, underdark, frost. The
+  quick maps set their own.
 - **Weather** that sits over the board: rain, storm, snow, ash, embers,
   spores, mist. Atmosphere only, and it stops when the OS asks for reduced
   motion.
@@ -77,6 +84,23 @@ off tokens, narration banners across the top.
   halve or double damage), `attack` (crits by the system's rules) and
   `combat` (rolls initiative from each token's bonus). The board rolls; the
   narrator reads the result.
+- **⚔ Combat tracker.** Turn order with portraits, AC, HP bars, quick
+  damage and heal, condition chips with values and durations. The board runs
+  turn effects itself: frightened ticks down, timed conditions expire,
+  persistent damage (burning, bleeding, poisoned) hits and gets its flat
+  check. A PC at 0 HP goes dying with wounded and recovery checks (PF2e) or
+  death saves (5e); fallen creatures lose their turns. When one side is down,
+  a victory or defeat card shows the tally: damage dealt and taken, hits,
+  crits and an MVP. Attacks swing, bolts fly and crits shake the board.
+- **📐 Area templates and a ruler.** Tap a square for a burst or cube, or
+  press on the caster and drag to aim a cone or line. Whoever is caught
+  glows and is listed; type each one's save modifier, the DC, damage and a
+  condition on a failure, and roll every save at once. One undo takes back
+  the whole spell. The ruler measures with the alternating 5/10 ft diagonal.
+- **Welcome, toasts and keys.** A first-visit card points at the three
+  things to try. A failed command tells you why even with the GM console
+  shut. Keys: n next turn, c combat, a area, d dice, b build, k Claude,
+  g GM console, z undo, ? the list.
 - **✦ Claude panel.** Three ways to play with Claude at the table:
   - **Rules assistant.** Ask about a rule or what someone can do this turn.
     It sees the board, rolls on the tray and proposes changes as a card you
@@ -93,8 +117,11 @@ off tokens, narration banners across the top.
     scores under 7.
 
   Every board change Claude makes goes through validated, all-or-nothing
-  tools: if anything in a batch is wrong, nothing happens and the error goes
-  back to the model.
+  tools: each tool call is first checked against its schema, then every
+  command against the board, and if anything is wrong nothing happens and
+  the error goes back to the model to fix. A 1200-call fuzz test throws
+  malformed calls at every tool and checks the board never falls out of
+  step.
 
 ### Bring your own key
 
@@ -163,6 +190,10 @@ Everything is also scriptable from the page itself:
 | `test/tiles.js` | Prop tiles, light, shadows, glow ceiling, walls (25 checks) |
 | `test/builder.js` | Build tab, seven quick-map generators × 25 seeds, weather (35 checks) |
 | `test/claude.js` | Claude panel against a mocked API: key storage, request shape, tool loops, Director, map maker, page engine (54 checks) |
+| `test/combat.js` | Combat engine: conditions with values, turn effects, dying and death saves, tally, victory, tracker, phone width (59 checks) |
+| `test/tools.js` | Schema validation of every Claude tool call, a 1200-call fuzz and a mocked retry loop (27 checks) |
+| `test/ambience.js` | Carried light, moods, quick-map ambience, welcome card, toasts and keys (27 checks) |
+| `test/area.js` | Area templates: shapes, who is caught, batch saves and undo, ruler, phone width (23 checks) |
 | `CLAUDE.md` | Briefing for Claude sessions run from this repo |
 
 ## Credits

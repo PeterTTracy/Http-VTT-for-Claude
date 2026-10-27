@@ -424,6 +424,22 @@
   .cs-note{color:var(--dim); margin-top:8px}
   .cs-btns{display:flex; gap:8px; justify-content:center; margin-top:14px}
   /* toast */
+  #areabar{margin:8px auto 0; max-width:980px; background:var(--panel,#14181b); border:1px solid rgba(214,164,90,.35); border-radius:10px; padding:8px 10px; display:flex; flex-direction:column; gap:7px; font:12px ui-monospace,Menlo,Consolas,monospace}
+  .token.caught{box-shadow:0 0 0 2px rgba(255,150,50,.95), 0 0 14px 3px rgba(255,150,50,.55)}
+  #areabar .ar-row{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+  #areabar .ar-seg{display:flex; flex-wrap:wrap; gap:4px}
+  #areabar .ar-seg .btn.on{background:rgba(214,164,90,.22); border-color:rgba(214,164,90,.8)}
+  #areabar .ar-f{display:flex; gap:4px; align-items:center; color:var(--dim,#8d8676)}
+  #areabar input.inp{width:62px} #areabar #admg,#areabar #acond{width:76px}
+  #areabar .ar-x{margin-left:auto}
+  #areabar .ar-n{color:var(--lamp,#e0b46a); margin-right:2px}
+  #areabar .ar-tok{display:inline-flex; align-items:center; gap:4px; padding:2px 4px 2px 2px; border-radius:16px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08)}
+  #areabar .ar-tok.foe{border-color:rgba(226,93,74,.45)} #areabar .ar-tok.pc{border-color:rgba(111,169,173,.5)}
+  #areabar .ar-tok img,#areabar .ar-tok svg,#areabar .ar-tok span{width:20px; height:20px; border-radius:50%; image-rendering:pixelated; fill:currentColor}
+  #areabar .ar-tok input.inp{width:38px; padding:1px 4px; text-align:center}
+  #areabar .ar-out{margin:0; padding-left:16px; color:var(--text,#d8d0bf); max-height:120px; overflow:auto}
+  #areabar .ar-out li.err{color:#e25d4a}
+  @media (max-width:520px){ #areabar .ar-seg .btn{padding:4px 6px} }
   #toast{position:fixed; left:50%; bottom:18px; z-index:65; transform:translate(-50%,12px); opacity:0; pointer-events:none;
     display:flex; gap:10px; align-items:center; max-width:min(92vw,560px); padding:8px 12px; border-radius:5px;
     background:var(--panel); border:1px solid var(--grid); box-shadow:0 8px 24px rgba(0,0,0,.6);
@@ -509,12 +525,14 @@
 </div>
 <div class="exits" id="exits" hidden></div>
 <div id="overview"></div>
+<div id="areabar" hidden></div>
 <div class="foot">
   <div class="measure" id="measure">drag a token to measure</div>
   <div class="tools">
     <button class="btn tool" id="claudebtn" title="Claude: rules assistant, narrator, map maker">✦ Claude</button>
     <button class="btn tool" id="combatbtn" title="combat tracker: turns, HP, conditions, the tally">⚔ Combat</button>
     <button class="btn tool" id="dice" title="dice tray">🎲 Dice</button>
+    <button class="btn tool" id="areabtn" title="area templates and a ruler: burst, cone, line, cube; roll everyone’s save (a)">📐 Area</button>
     <button class="btn tool" id="buildbtn" title="map builder, asset library, weather">✎ Build</button>
     <button class="btn" id="mapbtn" title="dungeon overview" hidden>🗺</button>
     <button class="btn" id="gmtoggle">⚙ GM</button>
@@ -3489,7 +3507,10 @@ function applyCmd(cmd){
     if(cmd.sub!==undefined)S.sub=cmd.sub;
     renderHeader(); return 'title updated';
   case 'move': return moveTok(findTok(cmd.t), cmd.to, cmd.instant);
-  case 'damage': return hpDelta(findTok(cmd.t), -Math.abs(cmd.n??cmd.hp??0));
+  case 'damage': { const tk=findTok(cmd.t), src=cmd.by??cmd.from??cmd.source;
+    let by=null; if(src!==undefined) by=findTok(src).id;          // credit the tally
+    HP_CTX=by?{by, crit:false}:null;
+    try{ return hpDelta(tk, -Math.abs(cmd.n??cmd.hp??0)); } finally { HP_CTX=null; } }
   case 'heal':   return hpDelta(findTok(cmd.t),  Math.abs(cmd.n??cmd.hp??0));
   case 'hp': {
     const tk=findTok(cmd.t);
@@ -3712,6 +3733,7 @@ function logLine(text, cls){
   ul.prepend(li);
   while(ul.children.length>200) ul.lastChild.remove();
 }
+let LAST_BATCH=[];   // what the last batch said, command by command
 function applyBatch(input){
   let cmds;
   if(Array.isArray(input)) cmds=input;
@@ -3720,16 +3742,17 @@ function applyBatch(input){
     cmds=[{do:'scene', scene:input.scene||input}];
   else throw 'expected a command, a command array, or a scene object';
   undoStack=[deep(S)]; // single-level undo of the whole batch
-  let ok=0;
+  let ok=0; LAST_BATCH=[];
   for(const cmd of cmds){
     try{
-      const msg=applyCmd(cmd); ok++;
+      const msg=applyCmd(cmd); ok++; LAST_BATCH.push({ok:true, text:String(msg)});
       logLine((cmd.do==='say'?'':'✓ ')+msg, cmd.do==='say'?'say':'');
       if(/^(attack|strike|save|check|damage|heal|cond)$/.test(cmd.do)) clog(msg.replace(/^🎲 /,''));
-    }catch(err){ const m=typeof err==='string'?err:err.message; logLine('✗ '+m, 'err');
+    }catch(err){ const m=typeof err==='string'?err:err.message; logLine('✗ '+m, 'err'); LAST_BATCH.push({ok:false, text:m});
       if(!$('gmconsole').classList.contains('show')) toast('That didn’t work: '+m,'err'); }
   }
   checkVictory();
+  areaRefresh();
   save();
   return ok;
 }
@@ -3806,7 +3829,7 @@ let saveTimer=null;
 function save(){
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>stSet(SKEY, JSON.stringify(
-    WORLD ? {v:6, w:WORLD, feedSeq} : {v:6, s:S, s0:S0, feedSeq})), 300);
+    WORLD ? {v:6, w:WORLD, feedSeq} : {v:6, s:{...S, markers:S.markers.filter(m=>m.id!=='_area')}, s0:S0, feedSeq})), 300);
 }
 async function tryRestore(){
   try{
@@ -5045,6 +5068,162 @@ viewport.addEventListener('pointermove', strokeMove, {capture:true});
 viewport.addEventListener('pointerup', strokeEnd, {capture:true});
 viewport.addEventListener('pointercancel', strokeEnd, {capture:true});
 
+/* =============================== area templates =============================== */
+/* tap a square to drop a burst or cube, drag from the caster to aim a cone
+   or a line, or drag to measure. Whoever stands in the area is listed, and
+   their saves roll in one batch, so one fireball is one undo. A square is
+   caught when its centre is inside the shape, the same shape that is drawn. */
+const AREA={on:false, shape:'circle', ft:20, w:5, dir:0, drag:null, prev:null, mods:{}, save:'', dc:'', dmg:'', cond:'', out:[], ruler:''};
+const AREA_SHAPES=[['circle','◯','burst'],['cone','◣','cone'],['line','━','line'],['square','▢','cube'],['ruler','📏','ruler']];
+const SAVE_NAMES={pf2e:['Reflex','Fortitude','Will'], '5e':['Dex','Con','Wis','Str','Int','Cha']};
+function cellInMarker(m,r,c){
+  const R=m.ft/5, e=.01;
+  if(m.shape==='square') return r>=m.r&&r<m.r+R&&c>=m.c&&c<m.c+R;
+  const dx=c-m.c, dy=r-m.r, d=Math.hypot(dx,dy);
+  if(m.shape==='circle') return d<=R+e;
+  if(d<e) return false;                                   // the caster's own square
+  const a=m.dir*Math.PI/180;
+  if(m.shape==='cone'){
+    let diff=Math.abs(Math.atan2(dy,dx)-a)%(2*Math.PI); if(diff>Math.PI) diff=2*Math.PI-diff;
+    return d<=R+e && diff<=Math.PI/6+e;
+  }
+  const along=dx*Math.cos(a)+dy*Math.sin(a), across=Math.abs(-dx*Math.sin(a)+dy*Math.cos(a));
+  return along>0&&along<=R+e&&across<=Math.max(.5,m.w/10)+e;
+}
+function caughtBy(m){
+  return S.tokens.filter(tk=>!tk.hidden&&tk.kind!=='mark'&&!tk.conds.includes('dead')&&
+    [...Array(tk.size*tk.size)].some((_,i)=>cellInMarker(m, tk.r+Math.floor(i/tk.size), tk.c+i%tk.size)));
+}
+function areaMarker(){ return S.markers.find(m=>m.id==='area'); }
+function setArea(on){
+  AREA.on=on; $('areabtn').classList.toggle('on',on);
+  viewport.classList.toggle('painting',on||!!BUILD.tool);
+  if(on){ if(BUILD.tool) setBuildTool(null); measure.textContent=AREA.shape==='ruler'?'📏 drag to measure':'📐 tap a square, or drag to aim'; }
+  else { AREA.drag=null; AREA.ruler=''; S.markers=S.markers.filter(m=>m.id!=='_area'); repaint(); }
+  renderArea();
+}
+function areaCellAt(e){
+  const rect=board.getBoundingClientRect();
+  return {c:(e.clientX-rect.left)/rect.width*COLS-.5, r:(e.clientY-rect.top)/rect.height*ROWS-.5};
+}
+function areaPreview(at,end){
+  const sh=AREA.shape, line=sh==='ruler';
+  let dir=AREA.dir, ft=AREA.ft, label='';
+  if(end&&(Math.abs(end.c-at.c)>.4||Math.abs(end.r-at.r)>.4)) dir=Math.atan2(end.r-at.r,end.c-at.c)*180/Math.PI;
+  if(line){ end=end||at; const er=clamp(Math.round(end.r),0,ROWS-1), ec=clamp(Math.round(end.c),0,COLS-1);
+    ft=Math.max(5,Math.hypot(er-at.r,ec-at.c)*5); const f=feet(at.r,at.c,er,ec);
+    label=f+' ft'; AREA.ruler=`${refOf(at.r,at.c)} → ${refOf(er,ec)} · ${f} ft`; measure.textContent='📏 '+AREA.ruler; }
+  if(sh==='cone'||sh==='line') AREA.dir=dir;
+  S.markers=S.markers.filter(m=>m.id!=='_area');
+  S.markers.push(normMarker({id:'_area', shape:line?'line':sh, at:{r:at.r,c:at.c}, ft, w:line?1:AREA.w, dir:Math.round(dir), color:line?'white':'orange', label}));
+  repaint();
+}
+function areaDown(e){
+  if(!AREA.on||e.button>0) return;
+  const cell=cellFromEvent(e); if(!cell) return;
+  e.stopPropagation(); e.preventDefault();
+  AREA.drag={r:cell.r, c:cell.c, id:e.pointerId};
+  AREA.prev=S.markers.filter(m=>m.id!=='_area');
+  try{ viewport.setPointerCapture(e.pointerId); }catch(_){}
+  areaPreview(cell, null);
+}
+function areaMove(e){
+  const d=AREA.drag; if(!d||e.pointerId!==d.id) return;
+  e.stopPropagation();
+  const p=areaCellAt(e);
+  if(AREA.shape==='circle'||AREA.shape==='square'){                 // drag a burst or cube to place it
+    const cell=cellFromEvent(e); if(cell){ d.r=cell.r; d.c=cell.c; } areaPreview(d,null);
+  } else areaPreview(d,p);
+}
+function areaUp(e){
+  const d=AREA.drag; if(!d||e.pointerId!==d.id) return;
+  e.stopPropagation();
+  AREA.drag=null;
+  const pv=S.markers.find(m=>m.id==='_area');
+  if(AREA.shape==='ruler'){ renderArea(); return; }                 // the line stays until the next tap
+  S.markers=AREA.prev||S.markers.filter(m=>m.id!=='_area');
+  const name=AREA_SHAPES.find(s=>s[0]===AREA.shape)[2];
+  applyBatch([{do:'marker', marker:{id:'area', shape:pv.shape, at:refOf(pv.r,pv.c), ft:pv.ft, w:pv.w, dir:pv.dir, color:'orange', label:`${pv.ft} ft ${name}`}}]);
+  AREA.out=[];
+  renderArea();
+}
+viewport.addEventListener('pointerdown', areaDown, {capture:true});
+viewport.addEventListener('pointermove', areaMove, {capture:true});
+viewport.addEventListener('pointerup', areaUp, {capture:true});
+viewport.addEventListener('pointercancel', areaUp, {capture:true});
+
+function areaRefresh(){ try{ if(AREA.on) renderArea(); }catch(e){} }   // safe before the area code has run
+function markCaught(){
+  const m=AREA.on&&areaMarker(), ids=new Set(m?caughtBy(m).map(t=>t.id):[]);
+  for(const [id,el] of live) el.classList.toggle('caught', ids.has(id));
+}
+function renderArea(){
+  const bar=$('areabar');
+  markCaught();
+  if(!AREA.on){ bar.hidden=true; bar.innerHTML=''; return; }
+  bar.hidden=false;
+  const m=areaMarker(), rs=rules(), names=SAVE_NAMES[rs]||SAVE_NAMES.pf2e;
+  if(!names.includes(AREA.save)) AREA.save=names[0];
+  let h=`<div class="ar-row"><span class="ar-seg">${AREA_SHAPES.map(([k,i,l])=>`<button class="btn${AREA.shape===k?' on':''}" data-ash="${k}" title="${l}">${i} ${l}</button>`).join('')}</span>`;
+  if(AREA.shape!=='ruler') h+=`<label class="ar-f">size <input class="inp" id="aft" type="number" min="5" max="240" step="5" value="${AREA.ft}"> ft</label>`;
+  if(AREA.shape==='line') h+=`<label class="ar-f">width <input class="inp" id="aw" type="number" min="5" max="60" step="5" value="${AREA.w}"> ft</label>`;
+  h+=`<button class="btn ar-x" data-aa="close" title="close the area tool (a)">✕</button></div>`;
+  if(AREA.shape==='ruler'){
+    h+=`<div class="ar-row dim">${AREA.ruler?esc(AREA.ruler)+' · diagonals alternate 5 and 10 ft':'Drag from one square to another to measure.'}</div>`;
+  } else if(!m){
+    h+=`<div class="ar-row dim">${AREA.shape==='cone'||AREA.shape==='line'?'Press on the caster’s square and drag to aim.':'Tap where it lands. Drag to move it.'}</div>`;
+  } else {
+    const caught=caughtBy(m);
+    h+=`<div class="ar-row"><b class="ar-n">${caught.length?caught.length+' caught':'nobody caught'}</b>`+
+      caught.map(tk=>`<span class="ar-tok ${tk.kind}">${portraitHTML(tk)}${esc(tk.name)}<input class="inp" data-amod="${esc(tk.id)}" placeholder="+0" value="${esc(AREA.mods[tk.id]??'')}" title="${esc(tk.name)}’s save modifier" inputmode="numeric"></span>`).join('')+`</div>`;
+    if(caught.length) h+=`<div class="ar-row"><select class="inp" id="asave">${names.map(n=>`<option${n===AREA.save?' selected':''}>${n}</option>`).join('')}</select>
+      <label class="ar-f">DC <input class="inp" id="adc" type="number" min="1" max="60" value="${esc(AREA.dc)}" placeholder="20"></label>
+      <label class="ar-f">damage <input class="inp" id="admg" value="${esc(AREA.dmg)}" placeholder="${rs==='5e'?'8d6':'6d6'}"></label>
+      <label class="ar-f">on a fail <input class="inp" id="acond" value="${esc(AREA.cond)}" placeholder="prone"></label>
+      <button class="btn primary" data-aa="roll">Roll ${caught.length} save${caught.length>1?'s':''}</button>
+      <button class="btn" data-aa="clear">Clear</button></div>`;
+    else h+=`<div class="ar-row"><button class="btn" data-aa="clear">Clear</button></div>`;
+    if(AREA.out.length) h+=`<ul class="ar-out">${AREA.out.map(o=>`<li class="${o.ok?'':'err'}">${esc(o.text)}</li>`).join('')}</ul>`;
+  }
+  bar.innerHTML=h;
+}
+$('areabar').addEventListener('input',e=>{
+  const t=e.target;
+  if(t.dataset.amod!==undefined) AREA.mods[t.dataset.amod]=t.value.trim();
+  else if(t.id==='adc') AREA.dc=t.value; else if(t.id==='admg') AREA.dmg=t.value.trim(); else if(t.id==='acond') AREA.cond=t.value.trim();
+});
+$('areabar').addEventListener('change',e=>{
+  const t=e.target, m=areaMarker();
+  if(t.id==='asave'){ AREA.save=t.value; return; }
+  if(t.id==='aft'||t.id==='aw'){
+    const v=clamp(Math.round((+t.value||5)/5)*5, 5, t.id==='aft'?240:60);
+    if(t.id==='aft') AREA.ft=v; else AREA.w=v;
+    if(m) applyBatch([{do:'marker', marker:{...m, at:refOf(m.r,m.c), ft:AREA.ft, w:AREA.w,
+      label:`${AREA.ft} ft ${AREA_SHAPES.find(s=>s[0]===m.shape)?.[2]||m.shape}`}}]);
+    renderArea();
+  }
+});
+$('areabar').addEventListener('click',e=>{
+  const sh=e.target.closest('[data-ash]');
+  if(sh){ AREA.shape=sh.dataset.ash; AREA.ruler=''; S.markers=S.markers.filter(m=>m.id!=='_area'); repaint(); setArea(true); return; }
+  const b=e.target.closest('[data-aa]'); if(!b) return;
+  const a=b.dataset.aa, m=areaMarker();
+  if(a==='close') setArea(false);
+  else if(a==='clear'){ applyBatch([{do:'unmark', id:'area'}]); AREA.out=[]; renderArea(); }
+  else if(a==='roll'&&m){
+    const dc=+AREA.dc;
+    if(!(dc>0)){ toast('Give the save a DC first','err'); $('adc')?.focus(); return; }
+    if(AREA.dmg){ try{ parseDice(AREA.dmg); }catch(err){ toast('Damage: '+(err.message||err),'err'); return; } }
+    const caught=caughtBy(m);
+    const batch=caught.map(tk=>({do:'save', t:tk.id, mod:parseInt(AREA.mods[tk.id],10)||0, dc,
+      label:`${tk.name} ${AREA.save}`, ...(AREA.dmg?{damage:AREA.dmg}:{}), ...(AREA.cond?{cond:AREA.cond}:{})}));
+    applyBatch(batch);
+    AREA.out=LAST_BATCH.map(o=>({ok:o.ok, text:o.text.replace(/^🎲 /,'')}));
+    renderArea();
+  }
+});
+$('areabtn').addEventListener('click',()=>setArea(!AREA.on));
+
 function renderBuilder(){
   const box=$('p-build');
   const opt=(v,l,cur)=>`<option value="${v}"${v===cur?' selected':''}>${l}</option>`;
@@ -5157,7 +5336,7 @@ function sceneToJSON(st){
     ...(st.weather&&st.weather.type!=='none'?{weather:st.weather}:{}),
     ...(st.mood&&st.mood!=='none'?{mood:st.mood}:{}),
     tokens:st.tokens.map(({r,c,...t})=>({...t, at:ref(r,c), conds:t.conds})),
-    markers:st.markers.map(({r,c,...m})=>({...m, at:ref(r,c)})),
+    markers:st.markers.filter(m=>m.id!=='_area').map(({r,c,...m})=>({...m, at:ref(r,c)})),
     initiative:st.initiative, round:st.round, active:st.active, legend:st.legend};
 }
 
@@ -5668,6 +5847,8 @@ function boardBrief(){
       ...(tk.size>1?{size:tk.size}:{}), ...(tk.hidden?{hidden:true}:{})}; });
   g.size=`${ROWS} rows (A to ${LETTERS[ROWS-1]}) × ${COLS} columns (1 to ${COLS}), 1 square = 5 ft`;
   g.initiative=S.initiative.length?S.initiative.map((e,i)=>(i===S.active?'▶ ':'')+e.name):'not in combat';
+  const areas=S.markers.filter(m=>m.id!=='_area');
+  if(areas.length) g.areas=areas.map(m=>({id:m.id, ...(m.label?{label:m.label}:{}), shape:m.shape, at:refOf(m.r,m.c), ft:m.ft, caught:caughtBy(m).map(t=>t.id)}));
   return g;
 }
 function boardText(){
@@ -5687,6 +5868,7 @@ const COMMAND_CARD=`Board commands are JSON objects; send them as an array. A sq
 - {"do":"spawn","token":{"id":"gh2","name":"Ghoul 2","at":"C5","kind":"foe","art":"ghoul","hp":22,"ac":13,"init":8}} · {"do":"remove","t":"gh2"}
 - {"do":"hide","t":"x"} · {"do":"reveal","t":"x","at":"F9"}
 - {"do":"marker","marker":{"id":"fb","shape":"circle","at":"F6","ft":20,"color":"orange","label":"fireball"}}: shapes circle, cone (ft + dir N/NE/E/…), line (ft + dir + w), square · {"do":"unmark","id":"fb"}
+  dir can also be degrees (0 east, 90 south). The board state lists each marker under "areas" with the tokens it catches; roll a save for each caught token to resolve it.
 - {"do":"say","text":"…","tone":"danger"}: a banner across the board, for big moments only
 - {"do":"ping","at":"F9"} · {"do":"zone","from":"A1","to":"B3","type":"fog"} · {"do":"ambient","light":"dark"} · {"do":"weather","type":"storm","intensity":0.8}
 - {"do":"light","t":"G","carry":"torch"}: a light that moves with a token (torch lantern candle light sunrod glow, or "none") · {"do":"mood","type":"dusk"}: colour grade for time of day (none dawn day dusk night firelit eerie bloodmoon underdark frost)`;
@@ -6374,7 +6556,7 @@ function toast(text,tone,act){
 }
 $('toast').addEventListener('click',e=>{ if(!e.target.closest('button')) $('toast').className=''; });
 
-const SHORTCUTS=[['n','next turn'],['c','combat tracker'],['d','dice tray'],['b','map builder'],['k','Claude'],['g','GM console'],['z','undo the last change'],['?','this list']];
+const SHORTCUTS=[['n','next turn'],['c','combat tracker'],['a','area templates'],['d','dice tray'],['b','map builder'],['k','Claude'],['g','GM console'],['z','undo the last change'],['?','this list']];
 function typing(e){ const t=e.target; return t&&(t.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)); }
 addEventListener('keydown',e=>{
   if(e.ctrlKey||e.metaKey||e.altKey||typing(e)) return;
@@ -6382,6 +6564,7 @@ addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
   if(k==='n'&&S.initiative.length){ applyBatch([{do:'next'}]); toast(`Round ${S.round} · ${(S.initiative[S.active]?.name||'').replace(/ \d+$/,'')}'s turn`); }
   else if(k==='c') openSide('combat');
+  else if(k==='a') setArea(!AREA.on);
   else if(k==='d') openSide('dice');
   else if(k==='b') openSide('build');
   else if(k==='k') openSide('claude');
@@ -6417,7 +6600,7 @@ $('welcome').addEventListener('click',e=>{
   const a=b.dataset.wl;
   if(a!=='go') openSide(a,true);
 });
-addEventListener('keydown',e=>{ if(e.key==='Escape'&&!$('welcome').hidden) closeWelcome(); });
+addEventListener('keydown',e=>{ if(e.key!=='Escape') return; if(!$('welcome').hidden) closeWelcome(); else if(AREA.on&&!typing(e)) setArea(false); });
 function maybeWelcome(){
   let seen=null; try{ seen=localStorage.getItem(WKEY); }catch(e){ seen='1'; }
   const forced=/[?&]welcome\b/.test(location.search);

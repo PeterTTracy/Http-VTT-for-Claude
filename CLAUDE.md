@@ -34,7 +34,8 @@ repo root, then open `http://localhost:8000/`.
   convert external refs to internal 0-based `r`/`c`.
 - Verify with the regression suites: `node test/smoke.js`, `node test/fow.js`,
   `node test/world.js`, `node test/mega.js`, `node test/tiles.js`,
-  `node test/builder.js` and `node test/claude.js`
+  `node test/builder.js`, `node test/claude.js`, `node test/combat.js`,
+  `node test/tools.js`, `node test/ambience.js` and `node test/area.js`
   (need Playwright;
   preinstalled in Claude Code web sessions — `NODE_PATH=/opt/node22/lib/node_modules`
   if it isn't local). It serves the repo, drives `window.VTT.apply([...])`,
@@ -87,4 +88,20 @@ repo root, then open `http://localhost:8000/`.
   localStorage (`getKey`/`setKey`/`forgetKey`). Never copy it into `S`,
   `SET`, `CL`, a log line or the DOM; `test/claude.js` fails if it shows up
   anywhere else.
-
+- Every Claude tool input goes through `prepToolInput` (a small JSON Schema
+  check, `schemaErrors`, with gentle coercion of a JSON string or a single
+  object) before `run`; a refusal must be an `Error` with a message the model
+  can act on. `test/tools.js` fuzzes 1200 malformed calls and fails if one
+  changes the board.
+- Combat bookkeeping lives between `VALUED` and `showSummary`: `addCond` /
+  `removeCond` (values in `tk.cval`, durations in `tk.cdur`), `turnHooks`
+  (end and start of turn), `deathRules`/`recoveryCheck`, `tallyHit` (credit
+  through `HP_CTX`), `checkVictory`. `hpDelta` is the one place HP changes,
+  so damage from anywhere reaches dying, the tally and victory.
+- Moods (`MOODS`) are composite layers drawn after darkness and before glow;
+  carried light (`CARRY`, `tk.light`) is just another source in
+  `computeLight`, so a moving token must refresh fog.
+- Area templates (`AREA`, `cellInMarker`, `caughtBy`) use the same shapes
+  `drawMarker` draws; the live preview is the marker id `_area`, which
+  `save` and `sceneToJSON` leave out. Batch saves go through `applyBatch`
+  so one undo takes back the whole area.
