@@ -423,6 +423,39 @@
   .cs-tab tr.foe td:first-child{color:#e2a093} .cs-tab tr.down td{opacity:.7}
   .cs-note{color:var(--dim); margin-top:8px}
   .cs-btns{display:flex; gap:8px; justify-content:center; margin-top:14px}
+  /* toast */
+  #toast{position:fixed; left:50%; bottom:18px; z-index:65; transform:translate(-50%,12px); opacity:0; pointer-events:none;
+    display:flex; gap:10px; align-items:center; max-width:min(92vw,560px); padding:8px 12px; border-radius:5px;
+    background:var(--panel); border:1px solid var(--grid); box-shadow:0 8px 24px rgba(0,0,0,.6);
+    font:12px ui-monospace,Menlo,monospace; color:var(--text); transition:opacity .25s, transform .25s}
+  #toast.show{opacity:1; transform:translate(-50%,0); pointer-events:auto}
+  #toast.err{border-color:var(--hurt); border-left-width:4px}
+  /* first-run welcome */
+  #welcome{position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding:16px;
+    background:radial-gradient(ellipse at center,rgba(20,24,27,.72),rgba(5,7,8,.9)); backdrop-filter:blur(3px)}
+  #welcome[hidden]{display:none}
+  .wl-card{width:min(560px,100%); max-height:94vh; overflow-y:auto; text-align:center; padding:22px 22px 16px;
+    background:linear-gradient(#1c2226,#131719); border:1px solid #4c3f25; border-radius:10px;
+    box-shadow:0 30px 80px rgba(0,0,0,.75),0 0 0 1px rgba(217,163,90,.08) inset; color:var(--text);
+    font:12.5px ui-monospace,Menlo,monospace; animation:csin .5s cubic-bezier(.2,.9,.3,1.15)}
+  .wl-heroes{display:flex; justify-content:center; margin-bottom:6px}
+  .wl-heroes img{width:52px; height:52px; margin:0 -5px; border-radius:50%; image-rendering:pixelated; background:radial-gradient(#3a4248,#14181b);
+    border:2px solid var(--lamp); box-shadow:0 4px 10px rgba(0,0,0,.6); animation:wlbob 3.2s ease-in-out infinite; animation-delay:calc(var(--i) * -.45s)}
+  @keyframes wlbob{0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)}}
+  @media (prefers-reduced-motion:reduce){ .wl-heroes img,.wl-card{animation:none} }
+  .wl-card h2{font:600 26px "Iowan Old Style",Georgia,serif; color:var(--bone); margin:8px 0 6px; letter-spacing:.02em}
+  .wl-lede{color:var(--dim); line-height:1.6; margin:0 auto 14px; max-width:440px}
+  .wl-steps{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px}
+  @media (max-width:520px){ .wl-steps{grid-template-columns:1fr} .wl-heroes img{width:40px; height:40px} }
+  .wl-step{cursor:pointer; display:flex; gap:9px; align-items:flex-start; text-align:left; padding:10px; border-radius:6px;
+    background:#0f1316; border:1px solid var(--grid); color:var(--text); font:11.5px/1.45 ui-monospace,Menlo,monospace}
+  .wl-step:hover,.wl-step:focus-visible{border-color:var(--lamp); background:#1f1a12; outline:none}
+  .wl-step b{flex:none; width:22px; height:22px; border-radius:50%; background:var(--lamp); color:#1a1207; display:flex; align-items:center; justify-content:center}
+  .wl-step i{display:block; font-style:normal; color:var(--bone); font-weight:700; margin-bottom:2px}
+  .wl-step span{color:var(--dim)}
+  .wl-foot{display:flex; gap:12px; justify-content:center; align-items:center}
+  .wl-foot .btn{padding:7px 16px; font-size:12px}
+  #inspector .btn.on{border-color:var(--lamp); color:var(--lamp); background:#1f1a12}
   #inspector{display:none; width:min(96vw,860px); margin-top:8px; background:var(--panel);
     border:1px solid var(--grid); border-radius:4px; padding:8px 12px;
     font-family:ui-monospace,monospace; font-size:11.5px}
@@ -534,6 +567,8 @@
 </div>
 <div id="banner"></div>
 <div id="csum" hidden></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="welcome" hidden></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="tk-ui-swords" viewBox="0 0 512 512"><g transform="rotate(45 256 256)"><path d="M256 26l24 44v262h-48V70z"/><path d="M186 332h140v30H186z"/><path d="M241 362h30v78h-30z"/><circle cx="256" cy="458" r="22"/></g><g transform="rotate(-45 256 256)"><path d="M256 26l24 44v262h-48V70z"/><path d="M186 332h140v30H186z"/><path d="M241 362h30v78h-30z"/><circle cx="256" cy="458" r="22"/></g></symbol>
   <symbol id="tk-c-wounded" viewBox="0 0 512 512"><path d="M256 36S118 222 118 322a138 138 0 0 0 276 0C394 222 256 36 256 36z"/><path fill="#171c20" d="M168 300l176-58 12 36-176 58z"/></symbol>
@@ -643,6 +678,7 @@ function normToken(t){
     ...(t.cval&&typeof t.cval==='object'?{cval:Object.fromEntries(Object.entries(t.cval).filter(([k,v])=>typeof v==='number'||DICE_VAL_RE.test(String(v))))}:{}),
     ...(t.cdur&&typeof t.cdur==='object'?{cdur:Object.fromEntries(Object.entries(t.cdur).filter(([k,v])=>Number.isInteger(v)&&v>0))}:{}),
     ...(t.ds&&Number.isInteger(t.ds.s)&&Number.isInteger(t.ds.f)?{ds:{s:t.ds.s,f:t.ds.f}}:{}),
+    ...(normCarry(t.light)?{light:normCarry(t.light)}:{}),
     aura:t.aura&&t.aura.ft?{ft:t.aura.ft, color:t.aura.color||'blue'}:null,
     hidden:!!t.hidden,
     party:t.party,
@@ -682,6 +718,20 @@ function normMarker(m){
     ft:m.ft||10, w:m.w||5, dir, color:m.color||'orange', label:m.label||''};
 }
 const WEATHERS=['none','rain','storm','snow','ash','embers','spores','mist'];
+/* light a token carries, in feet of bright / dim light; it moves with them */
+const CARRY={torch:[20,40], lantern:[30,60], candle:[5,10], light:[20,40], sunrod:[30,60], glow:[10,20]};
+function normCarry(v){
+  if(!v||v==='none') return null;
+  if(typeof v==='string'){ const k=v.toLowerCase().trim(); return CARRY[k]?{kind:k, bright:CARRY[k][0], dim:CARRY[k][1]}:null; }
+  if(typeof v==='object'&&Number.isFinite(+v.dim)) return {kind:CARRY[v.kind]?v.kind:'torch', bright:clamp(+(v.bright??v.dim/2),0,120), dim:clamp(+v.dim,0,240)};
+  return null;
+}
+/* a colour grade over the whole map: time of day and mood */
+const MOODS={none:[], dawn:[['soft-light','#ffb27a',.45],['multiply','#d9c3d6',.25]], day:[['soft-light','#fff4d8',.25]],
+  dusk:[['multiply','#7a63a8',.42],['soft-light','#ff8a4a',.28]], night:[['multiply','#25335e',.62],['soft-light','#6f8fd0',.12]],
+  firelit:[['multiply','#6b3a1c',.32],['soft-light','#ff8a2a',.4]], eerie:[['multiply','#2f6a58',.45],['soft-light','#9affd2',.18]],
+  bloodmoon:[['multiply','#8a1f22',.5],['soft-light','#ff6a4a',.2]], underdark:[['multiply','#3a2a5e',.58],['soft-light','#b07aff',.14]],
+  frost:[['multiply','#a6c2dc',.45],['soft-light','#e8f6ff',.3]]};
 function normWeather(w){
   if(!w) return {type:'none', intensity:.6};
   if(typeof w==='string') w={type:w};
@@ -707,6 +757,7 @@ function normScene(inp){
     active:0, round:sc.round||1,
     maxLight:sc.maxLight,
     weather:normWeather(sc.weather),
+    mood:MOODS[sc.mood]?sc.mood:'none',
     legend:sc.legend||[]};
   for(const tk of st.tokens){ tk.r=clamp(tk.r,0,rows-tk.size); tk.c=clamp(tk.c,0,cols-tk.size); }
   if(sc.active!==undefined){
@@ -750,7 +801,21 @@ const PIXEL_ART={
   rat:['................','..SS........SS..','.SffS......SffS.','.SfFSSSSSSSSFfS.','..SSAAAAAAAASS..','...AAAAAAAAAA...','..AAkAAAAAAkAA..','..AAAAAAAAAAAA..','...AAAAAAAAAA...','....AAAffAAA....','....AAfkkfAA....','.....AAwwAA.....','....AAAAAAAA....','...AAAAAAAAAA...','..AAAAAAAAAAAA..','.AAAAAAAAAAAAAA.'],
   ooze:['................','................','................','......gggg......','....gggggggg....','...gggGggggggg..','..ggggggggggggg.','..ggkkgggggkkgg.','..ggkkggggGkkgg.','.gggggggggggggg.','.ggggggkkggggGgg','.gGgggggggggggg.','ggggggGgggggggGg','gggGgggggggGgggg','.gggggggggggggg.','..gggg.gggg.gg..'],
   bat:['................','................','..M.........M...','..MM..M..M.MM...','..MMM.MMMM.MMM..','.MMMMMMMMMMMMMM.','.MMMMrMMMMrMMMMM','MMMMMMMMMMMMMMMM','MMM.MMMwwMMM.MMM','MM...MMMMMM...MM','M.....MMMM.....M','.......MM.......','................','................','................','................'],
-  ranger:['................','.....GGGGGG.....','....GGGGGGGG....','...GGGGGGGGGG...','...GGaaaaaaGG...','..GGaffffffaGG..','..GGfkiffikfGG..','..GGffffffffGG..','..GGfffFFfffGG..','..GGfFnnnnFfGG..','...GGffffffGG...','....GGFFFFGG....','..lLGGGGGGGGLl..','.lLlLGGGGGGLlLl.','.LlLlLGGGGLlLlL.','lLlLLlLGGLlLLlLl']};
+  ranger:['................','.....GGGGGG.....','....GGGGGGGG....','...GGGGGGGGGG...','...GGaaaaaaGG...','..GGaffffffaGG..','..GGfkiffikfGG..','..GGffffffffGG..','..GGfffFFfffGG..','..GGfFnnnnFfGG..','...GGffffffGG...','....GGFFFFGG....','..lLGGGGGGGGLl..','.lLlLGGGGGGLlLl.','.LlLlLGGGGLlLlL.','lLlLLlLGGLlLLlLl'],
+  goblin:['................','................','......GGGG......','....GGggggGG....','gg.GggggggggG.gg','.ggGggggggggGgg.','..GgkyggggykgG..','...gggggggggg...','...ggggGGgggg...','...gkwkkkkwkg...','....gggggggg....','.....GGGGGG.....','..LlLLggggLLlL..','.LlLLLLllLLLLlL.','.LLlLLLLLLLLlLL.','LlLLlLLLLLLlLLlL'],
+  kobold:['................','....s......s....','....sa....as....','....aaaaaaaa....','...aanaaaanaa...','...aaaaaaaaaa...','...akyaaaayka...','...aaaaaaaaaa...','....anaaaana....','....aaaaaaaa....','....awawwawa....','.....aaaaaa.....','...llaaaaaall...','..lLLlaaaalLLl..','.lLLLLlLLlLLLLl.','lLLlLLLLLLLLlLLl'],
+  bandit:['................','.....xxxxxx.....','....xxxxxxxx....','...xxxxxxxxxx...','...xxffffffxx...','..xxffffffffxx..','..xxkeffffekxx..','..xxffffffffxx..','..xxMMMMMMMMxx..','..xxMmMMMMmMxx..','...xMMMMMMMMx...','....xMMMMMMx....','..xxxxxxxxxxxx..','.xCxxxxxxxxxxCx.','.xCCxxxxxxxxCCx.','xCxCxxxxxxxxCxCx'],
+  barbarian:['................','....aaaaaaaa....','...aaaaaaaaaa...','..aaaaaaaaaaaa..','..aaffffffffaa..','.aaFffffffffFaa.','.aafkeffffekfaa.','.aazzffffffzzaa.','.aaffffFFffffaa.','..aaaaaaaaaaaa..','..aaaaaaaaaaaa..','...aaaaaaaaaa...','.ccCaaaaaaaaCcc.','cCcCcffffffcCcCc','cCcCffffffffCcCc','CcCcffFffFffcCcC'],
+  bard:['.y..............','..y..pppppp.....','...ypppppppp....','...pppppppppp...','..PPPPPPPPPPPP..','...nnffffffnn...','...nkeffffekn...','...nffffffffn...','...ffffFFffff...','....ffzzzzff....','.....ffffff.....','......ffff......','..ppqppppppqpp..','.pppqppppppqppp.','.ppvqppppppqvpp.','pppvqppppppqvppp'],
+  monk:['................','................','.....ffffff.....','....ffffffff....','...FffffffffF...','...ffffffffff...','...fkkffffkkf...','...ffffffffff...','...ffffFFffff...','....fFffffFf....','.....ffffff.....','......ffff......','..oooaffffaooo..','.oooooannaooooo.','.ooooonnnnooooo.','ooooononnonooooo'],
+  druid:['n.n..........n.n','.nn..........nn.','.nn..........nn.','..nGGGGGGGGGGn..','..GGGGGGGGGGGG..','..GGffffffffGG..','..GfkeffffekfG..','..GffffffffffG..','..GffffFFffffG..','..GGfccccccfGG..','...GccccccccG...','...GGccccccGG...','..gGGGggggGGGg..','.gGgGGGggGGGgGg.','.GgGgGGGGGGgGgG.','gGgGgGGggGGgGgGg'],
+  wolf:['................','..S..........S..','..SS........SS..','..SsS......SsS..','...SsSSSSSSsS...','...SssssssssS...','..SskyssssyksS..','..SssssssssssS..','...SsswwwwssS...','....SswwwwsS....','....SwwkkwwS....','.....SwwwwS.....','..SSssssssssSS..','.SSssssssssssSS.','SSsSssssssssSsSS','SsSsssSssSsssSsS'],
+  dragon:['q..............q','.q............q.','.qq..RRRRRR..qq.','..qRRRRRRRRRRq..','..RRrrrrrrrrRR..','.RRrrrrrrrrrrRR.','RRrkyrrrrrrykrRR','.RrrrrrrrrrrrrR.','..RrrrrrrrrrrR..','...RrrkrrkrrR...','...RwrwrrwrwR...','....RRRRRRRR....','...RyyyyyyyyR...','..RRyoyyyyoyRR..','.RRRyyoyyoyyRRR.','RRRyoyyooyyoyRRR'],
+  mummy:['................','.....ssssss.....','....swwwwwws....','...swssssssws...','...wwwwwwwwww...','...sssswwssss...','...skywsswyks...','...wwwwwwwwww...','...ssswsswsss...','...wwwsssswww...','....swwwwwws....','.....ssssss.....','..swwwsssswwws..','.swsswwwwwwssws.','.wwwssswwssswww.','swsswwwsswwwssws'],
+  ghost:['................','.....TTTTTT.....','....TiittiiT....','...TiittttiiT...','...TittttttiT...','..TittttttttiT..','..TtkkTttTkktT..','..TtkkTttTkktT..','..TttttttttttT..','..TttttkkttttT..','..TttttkkttttT..','..TttttttttttT..','..TTttttttttTT..','.TTTttttttttTTT.','..T.TttTTttT.T..','.T...T.TT.T...T.'],
+  demon:['................','.x............x.','.xx..........xx.','..xxZZZZZZZZxx..','...ZZzzzzzzZZ...','..ZZzzzzzzzzZZ..','..ZzkozzzzokzZ..','..ZzzzzzzzzzzZ..','..ZzzzzZZzzzzZ..','...ZzwkkkkwzZ...','....ZzzzzzzZ....','.....ZZZZZZ.....','..ZZZZzzzzZZZZ..','.ZZZzzzzzzzzZZZ.','ZZxZzzzzzzzzZxZZ','ZxZZzzZzzZzzZZxZ'],
+  mimic:['................','................','..cccccccccccc..','.ccyQccccccQycc.','.cCCQCCCCCCQCCc.','.cwkwkwkkwkwkwc.','.ckkkkkkkkkkkkc.','.ckkkkrrrrkkkkc.','.ckkkrrrrrrkkkc.','.cwkwkwkkwkwkwc.','.cCCQCCCCCCQCCc.','.cccQccccccQccc.','.cCCQCCCCCCQCCc.','.cccQccccccQccc.','.CCCCCCCCCCCCCC.','................'],
+  eyebeast:['..w...w..w...w..','..p...p..p...p..','...p..p..p..p...','...pPPPPPPPPp...','..PPppppppppPP..','.PPppwwwwwwppPP.','.PpwwwuuuuwwwpP.','.PpwwukkkkuwwpP.','.PpwwukkkkuwwpP.','.PpwwwuuuuwwwpP.','.PPppwwwwwwppPP.','.PPppppppppppPP.','..PpwkwkkwkwpP..','..PPppppppppPP..','...PPPPPPPPPP...','................']};
 function shadeHex(hex,k){ const n=parseInt(hex.slice(1),16); let r=n>>16,g=(n>>8)&255,b=n&255;
   const f=v=>Math.max(0,Math.min(255,Math.round(k>0?v+(255-v)*k:v*(1+k))));
   return `rgb(${f(r)},${f(g)},${f(b)})`; }
@@ -2926,6 +2991,12 @@ function drawScene(t){
   }
   for(const p of S.props) if(p.kind) drawProp(p,t);
   drawDarkness();
+  const md=MOODS[S.mood]; if(md&&md.length){
+    ctx.save();
+    for(const [op,col,a] of md){ ctx.globalCompositeOperation=op; ctx.globalAlpha=a; ctx.fillStyle=col;
+      ctx.fillRect(gx(0),gy(0),COLS*CELL,ROWS*CELL); }
+    ctx.restore();
+  }
   drawGlow();   // all light sources, accumulated and capped
   if(S.line){
     const y=gy(S.line.afterRow+1);
@@ -3064,6 +3135,8 @@ function computeLight(){
       dim:L.dim!==undefined?L.dim/5:(L.rad||2.2)*2})),
     ...S.props.filter(propLight).map(p=>{const [b,d]=propLight(p);
       return {r:p.r, c:p.c, bright:b/5, dim:d/5, cool:ARCANE.has(p.kind)};}),
+    ...S.tokens.filter(t=>t.light&&!t.hidden&&!t.conds.includes('dead')).map(t=>({r:t.r+Math.floor((t.size-1)/2), c:t.c+Math.floor((t.size-1)/2),
+      bright:t.light.bright/5, dim:t.light.dim/5, cool:t.light.kind==='light'||t.light.kind==='glow'})),
   ];
   if(sources.length>MAX_SOURCES){          // keep a pathological scene bounded
     logLine(`${sources.length} light sources — only the first ${MAX_SOURCES} are lit`,'err');
@@ -3402,7 +3475,7 @@ function moveTok(tk,to,instant){
       setTimeout(()=>el.classList.remove('anim'),550); }
     place(el,tk); pulse(el);
   }
-  if(S.fow.on) refreshFOW(); else if(S.tokens.some(x=>x.aura)) repaint();
+  if(S.fow.on||tk.light) refreshFOW(); else if(S.tokens.some(x=>x.aura)) repaint();
   if(WORLD&&isParty(tk)){ renderExits(); repaint(); }
   return `${tk.name} → ${refOf(tk.r,tk.c)}`;
 }
@@ -3475,6 +3548,11 @@ function applyCmd(cmd){
     S.zones=cmd.type?S.zones.filter(z=>z.type!==cmd.type):[];
     rebuildTypeGrid(); refreshFOW(); return 'zones cleared';
   case 'light': {
+    if(cmd.t!==undefined){
+      const tk=findTok(cmd.t), L=normCarry(cmd.carry??cmd.light??cmd.kind??'torch');
+      if(L) tk.light=L; else delete tk.light;
+      refreshFOW(); if(selected===tk.id) renderInspector();
+      return L?`${tk.name} carries a ${L.kind} (${L.bright} ft bright, ${L.dim} ft dim)`:`${tk.name} has no light`; }
     S.lights.push(normLight(cmd));
     refreshFOW(); return 'light at '+cmd.at; }
   case 'clearlights': S.lights=[]; refreshFOW(); return 'lights out';
@@ -3580,6 +3658,10 @@ function applyCmd(cmd){
     S.weather=normWeather(cmd.type===undefined&&cmd.weather?cmd.weather:{type:cmd.type??'none', intensity:cmd.intensity??S.weather?.intensity});
     setWeather(S.weather.type, S.weather.intensity);
     return S.weather.type==='none'?'weather: clear':`weather: ${S.weather.type} (${Math.round(S.weather.intensity*100)}%)`; }
+  case 'mood': {
+    const m=String(cmd.type??cmd.mood??'none').toLowerCase();
+    if(!MOODS[m]) throw `unknown mood "${m}" (${Object.keys(MOODS).join(' ')})`;
+    S.mood=m; repaint(); return m==='none'?'mood: plain':'mood: '+m; }
   case 'ambient':
     if(cmd.light||cmd.ambient) S.fow.ambient=cmd.light||cmd.ambient;
     if(cmd.max!==undefined) S.maxLight=clamp(cmd.max,0,1);
@@ -3644,7 +3726,8 @@ function applyBatch(input){
       const msg=applyCmd(cmd); ok++;
       logLine((cmd.do==='say'?'':'✓ ')+msg, cmd.do==='say'?'say':'');
       if(/^(attack|strike|save|check|damage|heal|cond)$/.test(cmd.do)) clog(msg.replace(/^🎲 /,''));
-    }catch(err){ logLine('✗ '+(typeof err==='string'?err:err.message), 'err'); }
+    }catch(err){ const m=typeof err==='string'?err:err.message; logLine('✗ '+m, 'err');
+      if(!$('gmconsole').classList.contains('show')) toast('That didn’t work: '+m,'err'); }
   }
   checkVictory();
   save();
@@ -3663,7 +3746,8 @@ function renderInspector(){
   box.innerHTML=`
     <div class="row"><span class="nm">${esc(tk.name)}</span>
       <span>${refOf(tk.r,tk.c)} · ${tk.kind}${tk.size>1?' · '+tk.size+'×'+tk.size:''} · ${st}${tk.ac!==undefined?' · AC '+tk.ac:''}${tk.init!==undefined?' · init '+(tk.init>=0?'+':'')+tk.init:''}</span>
-      <button class="btn" data-a="remove" title="remove from the board" style="margin-left:auto">🗑</button>
+      <button class="btn${tk.light?' on':''}" data-a="torch" title="${tk.light?'put out the '+tk.light.kind:'carry a torch (20 ft bright, 40 ft dim)'}" style="margin-left:auto">🔥</button>
+      <button class="btn" data-a="remove" title="remove from the board">🗑</button>
       <button class="btn" data-a="close">✕</button></div>
     ${tk.hp?`<div class="row">hp
       <button class="btn" data-a="hp" data-n="-5">−5</button>
@@ -3681,6 +3765,7 @@ $('inspector').addEventListener('click',e=>{
   const tk=S.tokens.find(t=>t.id===selected); if(!tk)return;
   if(b.dataset.a==='close'){ selectTok(null); return; }
   if(b.dataset.a==='remove'){ applyBatch([{do:'remove', t:tk.id}]); return; }
+  if(b.dataset.a==='torch'){ applyBatch([{do:'light', t:tk.id, carry:tk.light?'none':'torch'}]); renderInspector(); return; }
   if(b.dataset.a==='hp') hpDelta(tk,+b.dataset.n);
   if(b.dataset.a==='cycle') cycleToken(tk);
   if(b.dataset.a==='cond'){
@@ -4023,6 +4108,7 @@ function stateForGM(){
       status:statusOf(tk),
       ...(tk.conds.length?{conds:tk.conds.map(c=>condLabel(tk,c))}:{}),
       ...(tk.ac!==undefined?{ac:tk.ac}:{}),
+      ...(tk.light?{carries:tk.light.kind}:{}),
       ...(tk.hidden?{hidden:true}:{}),
       ...(tk.aura?{aura:tk.aura.ft+' ft'}:{}),
       ...(visGrid&&!tokenSeen(tk)?{unseen:true}:{})})),
@@ -4977,6 +5063,8 @@ function renderBuilder(){
     <div class="row2"><span class="dim">weather</span>
       <select class="inp" id="bweather">${['none','rain','storm','snow','ash','embers','spores','mist'].map(w=>opt(w,w,wx.type)).join('')}</select>
       <input type="range" id="bwint" min="0.1" max="1" step="0.05" value="${wx.intensity??.6}" style="flex:1;accent-color:var(--lamp)" aria-label="weather intensity"></div>
+    <div class="row2"><span class="dim">mood</span>
+      <select class="inp" id="bmood">${Object.keys(MOODS).map(m=>opt(m,m,S.mood||'none')).join('')}</select></div>
     <div class="row2"><span class="dim">light</span>
       <select class="inp" id="bamb">${['bright','dim','dark'].map(a=>opt(a,a,S.fow.ambient)).join('')}</select>
       <label class="tog"><input type="checkbox" id="bfow"${S.fow.on?' checked':''}> fog of war</label></div>
@@ -5044,6 +5132,7 @@ $('p-build').addEventListener('change',e=>{
   const id=e.target.id;
   if(id==='bweather'||id==='bwint') applyBatch([{do:'weather', type:$('bweather').value, intensity:+$('bwint').value}]);
   if(id==='bamb') applyBatch([{do:'ambient', light:$('bamb').value}]);
+  if(id==='bmood') applyBatch([{do:'mood', type:$('bmood').value}]);
   if(id==='bfow') applyBatch([{do:'fow', on:$('bfow').checked}]);
   if(id==='bground') applyBatch([{do:'ground', ground:$('bground').value}]);
   if(id==='btitle'||id==='bsub') applyBatch([{do:'title', header:$('btitle').value, sub:$('bsub').value}]);
@@ -5066,6 +5155,7 @@ function sceneToJSON(st){
     lights:st.lights.map(L=>({at:ref(L.r,L.c), ...(L.bright!==undefined?{bright:L.bright,dim:L.dim}:{rad:L.rad})})),
     fow:{on:st.fow.on, ambient:st.fow.ambient},
     ...(st.weather&&st.weather.type!=='none'?{weather:st.weather}:{}),
+    ...(st.mood&&st.mood!=='none'?{mood:st.mood}:{}),
     tokens:st.tokens.map(({r,c,...t})=>({...t, at:ref(r,c), conds:t.conds})),
     markers:st.markers.map(({r,c,...m})=>({...m, at:ref(r,c)})),
     initiative:st.initiative, round:st.round, active:st.active, legend:st.legend};
@@ -5241,11 +5331,13 @@ function qmConnected(M){
 function qmFinish(M,meta){
   for(let r=0;r<M.rows;r++)for(let c=0;c<M.cols;c++) if(M.F[r][c]===M.ground) M.F[r][c]=null;
   const tokens=M.tokens.map(({darkvision,...t})=>({...t, ...(darkvision?{vision:{dark:darkvision}}:{})}));
+  (meta.carry||[]).forEach((k,i)=>{ const pc=tokens.filter(t=>t.kind==='pc')[i]; if(pc) pc.light=k; });   // who holds the torches
   return {header:meta.header, sub:meta.sub, ground:M.ground, rows:M.rows, cols:M.cols,
     zones:[...qmRects(M.F,M.rows,M.cols), ...qmRects(M.Z,M.rows,M.cols)],
     props:M.props, lights:M.lights, tokens,
     fow:{on:!!meta.fow, ambient:meta.ambient||'bright'},
     ...(meta.weather?{weather:meta.weather}:{}),
+    ...(meta.mood?{mood:meta.mood}:{}),
     initiative:[],
     legend:meta.legend||[]};
 }
@@ -5282,7 +5374,7 @@ const QUICK_MAPS=[
     ...(M.ch(.5)?[{name:'Wraith',art:'wraith',hp:28,ac:15,init:10,frame:'arcane'}]:[])], 1,1,8,16);
   if(!force&&!qmConnected(M)) return null;
   return qmFinish(M,{header:'The Gravelands Boneyard', sub:'night · mist off the barrows · 1 square = 5 ft',
-    ambient:'dim', weather:{type:'mist', intensity:.55},
+    ambient:'dim', weather:{type:'mist', intensity:.55}, mood:'night', carry:['lantern'],
     legend:[['low wall: cover','var(--dim)'],['fog: obscured','#9aa3ab']]});
  })},
 {id:'crypt', name:'Crypt', icon:'⚰', blurb:'Rooms and corridors cut into the rock under a chapel. Fog of war on, torches only.',
@@ -5338,7 +5430,7 @@ const QUICK_MAPS=[
   M.foes([{name:'Death Knight',art:'deathknight',hp:65,ac:20,init:8,frame:'blood'},
     {name:'Skeleton',art:'skeleton',hp:13,ac:14,init:6}],big.r1,big.c1,big.r2,big.c2);
   if(!force&&(rooms.length<4||!qmConnected(M))) return null;
-  return qmFinish(M,{header:'The Sunken Crypt', sub:'beneath the chapel · torchlight only', fow:true, ambient:'dark',
+  return qmFinish(M,{header:'The Sunken Crypt', sub:'beneath the chapel · torchlight only', fow:true, ambient:'dark', carry:['torch','torch'],
     legend:[['blight: sickening','#8aa05a'],['doors open with a tap of the GM','var(--dim)']]});
  })},
 {id:'chapel', name:'Ruined chapel', icon:'⛪', blurb:'A broken nave with a cult at the altar. Pillars for cover, a consecrated circle, ash on the wind.',
@@ -5364,7 +5456,7 @@ const QUICK_MAPS=[
     {name:'Cultist',art:'cultist',hp:16,ac:13,init:5},{name:'Cultist',art:'cultist',hp:16,ac:13,init:5},
     {name:'Cultist',art:'cultist',hp:16,ac:13,init:5},...(M.ch(.6)?[{name:'Ghoul',art:'ghoul',hp:22,ac:13,init:8}]:[])],2,4,6,11);
   if(!force&&!qmConnected(M)) return null;
-  return qmFinish(M,{header:'The Ashen Chapel', sub:'the rite is underway · 1 square = 5 ft', ambient:'dim',
+  return qmFinish(M,{header:'The Ashen Chapel', sub:'the rite is underway · 1 square = 5 ft', ambient:'dim', mood:'firelit',
     weather:{type:'ash', intensity:.5},
     legend:[['pillar: standard cover','var(--dim)'],['consecrated ground','#e8d9a0'],['rubble: difficult','var(--dim)']]});
  })},
@@ -5402,7 +5494,7 @@ const QUICK_MAPS=[
     {name:'Ooze',art:'ooze',hp:40,ac:8,init:1},{name:'Cave Rat',art:'rat',hp:6,ac:12,init:6},{name:'Cave Rat',art:'rat',hp:6,ac:12,init:6},
     {name:'Bat swarm',art:'bat',hp:12,ac:12,init:10}],...box(right));
   if(!force&&!qmConnected(M)) return null;
-  return qmFinish(M,{header:'The Weeping Cave', sub:'spores hang in the air · darkvision helps', fow:true, ambient:'dark',
+  return qmFinish(M,{header:'The Weeping Cave', sub:'spores hang in the air · darkvision helps', fow:true, ambient:'dark', mood:'underdark', carry:['light'],
     weather:{type:'spores', intensity:.6},
     legend:[['web: restrained on a failed save','var(--dim)'],['pool: deep water','#6fa9ad']]});
  })},
@@ -5430,7 +5522,7 @@ const QUICK_MAPS=[
   M.foes([{name:'Orc Raider',art:'orc',hp:23,ac:15,init:6},{name:'Orc Raider',art:'orc',hp:23,ac:15,init:6},
     {name:'Orc Raider',art:'orc',hp:23,ac:15,init:6},{name:'Bandit Archer',art:'ranger',hp:16,ac:14,init:9}],foeRows[0],0,foeRows[1],17);
   if(!force&&!qmConnected(M)) return null;
-  return qmFinish(M,{header:'The Vendry Road', sub:'an ambush in the rain · 1 square = 5 ft', ambient:'dim',
+  return qmFinish(M,{header:'The Vendry Road', sub:'an ambush in the rain · 1 square = 5 ft', ambient:'dim', mood:'dusk',
     weather:{type:'rain', intensity:.65},
     legend:[['trees: cover, block sight','var(--dim)'],['stream: difficult','#6fa9ad'],['ford: swamp, difficult','#7d8a5a']]});
  })},
@@ -5458,7 +5550,7 @@ const QUICK_MAPS=[
     {name:'Zombie',art:'zombie',hp:22,ac:8,init:2},{name:'Ghoul',art:'ghoul',hp:22,ac:13,init:8},
     {name:'Vampire Spawn',art:'vampire',hp:45,ac:15,init:11,frame:'blood'}],5,9,10,17);
   if(!force&&!qmConnected(M)) return null;
-  return qmFinish(M,{header:'Vendry Square', sub:'the night the dead came · 1 square = 5 ft', ambient:'dim',
+  return qmFinish(M,{header:'Vendry Square', sub:'the night the dead came · 1 square = 5 ft', ambient:'dim', mood:'night', carry:['torch'],
     weather:{type:'embers', intensity:.6},
     legend:[['timber walls: block sight','var(--dim)'],['mud: difficult','#7a6248']]});
  })},
@@ -5481,7 +5573,7 @@ const QUICK_MAPS=[
     {name:'Skeleton',art:'skeleton',hp:13,ac:14,init:6},{name:'Gravehound',art:'gravehound',hp:18,ac:13,init:9}],
     ...box(shore.slice(-14)));
   if(!force&&!qmConnected(M)) return null;
-  return qmFinish(M,{header:'Hollowmere', sub:'the lake froze the night they drowned · 1 square = 5 ft', ambient:'dim',
+  return qmFinish(M,{header:'Hollowmere', sub:'the lake froze the night they drowned · 1 square = 5 ft', ambient:'dim', mood:'frost',
     weather:{type:'snow', intensity:.6},
     legend:[['ice: slippery, Acrobatics or fall prone','#cfe4ee'],['open water: swim','#6fa9ad']]});
  })},
@@ -5596,13 +5688,15 @@ const COMMAND_CARD=`Board commands are JSON objects; send them as an array. A sq
 - {"do":"hide","t":"x"} · {"do":"reveal","t":"x","at":"F9"}
 - {"do":"marker","marker":{"id":"fb","shape":"circle","at":"F6","ft":20,"color":"orange","label":"fireball"}}: shapes circle, cone (ft + dir N/NE/E/…), line (ft + dir + w), square · {"do":"unmark","id":"fb"}
 - {"do":"say","text":"…","tone":"danger"}: a banner across the board, for big moments only
-- {"do":"ping","at":"F9"} · {"do":"zone","from":"A1","to":"B3","type":"fog"} · {"do":"ambient","light":"dark"} · {"do":"weather","type":"storm","intensity":0.8}`;
+- {"do":"ping","at":"F9"} · {"do":"zone","from":"A1","to":"B3","type":"fog"} · {"do":"ambient","light":"dark"} · {"do":"weather","type":"storm","intensity":0.8}
+- {"do":"light","t":"G","carry":"torch"}: a light that moves with a token (torch lantern candle light sunrod glow, or "none") · {"do":"mood","type":"dusk"}: colour grade for time of day (none dawn day dusk night firelit eerie bloodmoon underdark frost)`;
 
 /* ---------- validation: the mechanical layer decides ---------- */
-const CMD_NAMES=new Set(['scene','title','move','damage','heal','hp','status','cond','spawn','remove','marker','unmark','zone',
+const CMD_NAMES=new Set(['mood','scene','title','move','damage','heal','hp','status','cond','spawn','remove','marker','unmark','zone',
   'clearzones','light','clearlights','prop','unprop','ground','line','legend','init','turn','next','round','wall','walls',
   'fow','fog_of_war','weather','ambient','vision','hide','reveal','ping','aura','roll','check','save','attack','strike','combat','say']);
 const REF_RE=/^[A-Za-z]\d{1,2}$/;
+const CMD_ITEM={type:'object', properties:{do:{type:'string', enum:[...CMD_NAMES], description:'The command name'}}, required:['do']};
 function checkCmds(cmds){
   const errs=[];
   if(!Array.isArray(cmds)) return ['commands must be an array of command objects'];
@@ -5633,6 +5727,9 @@ function checkCmds(cmds){
       if(t.id&&S.tokens.some(x=>x.id===String(t.id))) errs.push(`#${i+1}: a token with id "${t.id}" is already on the board`); }
     if(d==='marker'&&c.marker) sq(c.marker.at,i,'marker.at');
     if(d==='roll'){ try{ parseDice(String(c.dice||c.d||'d20')); }catch(e){ errs.push(`#${i+1}: "${c.dice}" is not dice`); } }
+    if(d==='mood'&&!MOODS[String(c.type??c.mood??'none').toLowerCase()]) errs.push(`#${i+1}: unknown mood "${c.type??c.mood}" (use one of: ${Object.keys(MOODS).join(' ')})`);
+    if(d==='light'&&c.t!==undefined&&(c.carry??c.light??c.kind)!==undefined&&(c.carry??c.light??c.kind)!=='none'&&!normCarry(c.carry??c.light??c.kind)) errs.push(`#${i+1}: unknown light "${c.carry??c.light??c.kind}" (use one of: ${Object.keys(CARRY).join(' ')} none)`);
+    if(d==='light'&&c.t===undefined&&c.at===undefined) errs.push(`#${i+1}: light needs "at" (a square) or "t" (a token that carries it)`);
     if(d==='cond'||(d==='save'&&c.cond!==undefined)){
       const list=d==='cond'?[].concat(c.add??[],c.remove==='all'?[]:(c.remove??[])):[].concat(c.cond);
       if(d==='cond'&&c.add===undefined&&c.remove===undefined) errs.push(`#${i+1}: cond needs "add" or "remove"`);
@@ -5683,20 +5780,57 @@ function applyTransaction(cmds, by){
 /* ---------- tools the models may call ---------- */
 /* models sometimes send the array as a JSON string, or a single object */
 function asCmds(c){ if(typeof c==='string'){ try{ c=JSON.parse(c); }catch(e){ return c; } } return c&&!Array.isArray(c)&&c.do?[c]:c; }
+/* ---------- every tool call is checked against its schema before it runs ----------
+   A small JSON Schema subset (type, properties, required, enum, items,
+   minItems/maxItems, minimum/maximum, maxLength). The model gets a precise
+   error back and nothing on the board changes. */
+function schemaErrors(sc,v,at){
+  const out=[], here=at||'input';
+  if(!sc) return out;
+  const t=sc.type;
+  const isT={object:x=>x!==null&&typeof x==='object'&&!Array.isArray(x), array:Array.isArray, string:x=>typeof x==='string',
+    integer:Number.isInteger, number:x=>typeof x==='number'&&Number.isFinite(x), boolean:x=>typeof x==='boolean'};
+  if(t&&isT[t]&&!isT[t](v)){ out.push(`${here} should be ${t==='array'?'an array':t==='object'?'an object':'a '+t}`); return out; }
+  if(sc.enum&&!sc.enum.includes(v)) out.push(`${here} is "${v}", which is not one of: ${sc.enum.join(', ')}`);
+  if(t==='string'&&sc.maxLength&&v.length>sc.maxLength) out.push(`${here} is longer than ${sc.maxLength} characters`);
+  if((t==='integer'||t==='number')){ if(sc.minimum!==undefined&&v<sc.minimum) out.push(`${here} is below ${sc.minimum}`);
+    if(sc.maximum!==undefined&&v>sc.maximum) out.push(`${here} is above ${sc.maximum}`); }
+  if(t==='array'){
+    if(sc.minItems!==undefined&&v.length<sc.minItems) out.push(`${here} needs at least ${sc.minItems} item${sc.minItems>1?'s':''}`);
+    if(sc.maxItems!==undefined&&v.length>sc.maxItems) out.push(`${here} has more than ${sc.maxItems} items`);
+    if(sc.items) v.slice(0,60).forEach((x,i)=>out.push(...schemaErrors(sc.items,x,`${here}[${i}]`)));
+  }
+  if(t==='object'){
+    for(const k of sc.required||[]) if(v[k]===undefined) out.push(`${here}.${k} is required`);
+    for(const [k,ps] of Object.entries(sc.properties||{})) if(v[k]!==undefined) out.push(...schemaErrors(ps,v[k],`${here}.${k}`));
+  }
+  return out;
+}
+/* models sometimes send numbers as strings or the command array as a JSON string;
+   take those gently, then hold the rest to the schema */
+function prepToolInput(t,inp){
+  let i=inp&&typeof inp==='object'?{...inp}:inp;
+  if(i&&i.commands!==undefined) i.commands=asCmds(i.commands);
+  if(i&&t.name==='roll_dice'&&typeof i.dc==='string'&&/^\d+$/.test(i.dc)) i.dc=+i.dc;
+  if(i&&t.name==='build_map'&&typeof i.scene==='string'){ try{ i.scene=JSON.parse(i.scene); }catch(e){} }
+  const errs=schemaErrors(t.input_schema,i);
+  if(errs.length) throw new Error(`${t.name} was not run: the input doesn't match its schema.\n- ${errs.slice(0,8).join('\n- ')}\nFix the input and call again.`);
+  return i;
+}
 const TOOL_ROLL={name:'roll_dice', description:'Roll dice on the table for everyone to see. Use it for any roll no board command covers (a recall knowledge check with no token, a random encounter, a d100 table). Returns the total, each die, and the degree of success when a DC is given.',
   input_schema:{type:'object', properties:{dice:{type:'string', description:'Dice expression: d20+7, 2d6+3, 4d6kh3, d100'},
-    label:{type:'string', description:'What the roll is for'}, dc:{type:'integer', description:'Optional DC to grade the roll against'}}, required:['dice']},
-  run:i=>{ const r=rollDice(String(i.dice), i.label?String(i.label):undefined, false, {dc:i.dc!==undefined?+i.dc:undefined, by:'Claude'});
+    label:{type:'string', maxLength:120, description:'What the roll is for'}, dc:{type:'integer', minimum:0, maximum:99, description:'Optional DC to grade the roll against'}}, required:['dice']},
+  run:i=>{ let r; try{ r=rollDice(String(i.dice), i.label?String(i.label):undefined, false, {dc:i.dc!==undefined?+i.dc:undefined, by:'Claude'}); }catch(e){ throw e instanceof Error?e:new Error(String(e)); }
     return {total:r.total, rolls:r.rolls, natural:r.nat, ...(r.degreeName?{degree:r.degreeName}:{}), text:r.txt}; },
   note:(i,r)=>`🎲 ${r.text}`};
 const TOOL_APPLY={name:'apply_commands', description:'Change the board: move tokens, make attacks, saves and checks (the board rolls the dice), apply damage and conditions, run initiative and turns. All commands apply together or not at all. Returns what each command did, including every die rolled, and the board afterwards. On an error nothing changes: read it, fix the command and call again.',
-  input_schema:{type:'object', properties:{commands:{type:'array', items:{type:'object'}, description:'Board commands, see the command reference'},
+  input_schema:{type:'object', properties:{commands:{type:'array', minItems:1, maxItems:40, items:CMD_ITEM, description:'Board commands, see the command reference'},
     why:{type:'string', description:'One short line on what this does, for the log'}}, required:['commands']},
   run:i=>{ const res=applyTransaction(asCmds(i.commands),'✦'); return {applied:res, board:boardBrief()}; },
   note:(i,r)=>r.applied.map(x=>'✓ '+x).join('\n')};
 const TOOL_SUGGEST={name:'suggest_commands', description:'Propose board changes for the GM to apply with one tap (move a token, add a condition, apply damage, start combat). They are checked now and only applied if the GM agrees. Returns whether they are valid; fix and call again if not.',
-  input_schema:{type:'object', properties:{commands:{type:'array', items:{type:'object'}},
-    summary:{type:'string', description:'One line the GM reads on the Apply button card'}}, required:['commands','summary']},
+  input_schema:{type:'object', properties:{commands:{type:'array', minItems:1, maxItems:40, items:CMD_ITEM},
+    summary:{type:'string', maxLength:200, description:'One line the GM reads on the Apply button card'}}, required:['commands','summary']},
   run:(i,ctx)=>{ const cmds=asCmds(i.commands), errs=checkCmds(cmds);
     if(errs.length) throw new Error('Not valid:\n- '+errs.join('\n- '));
     ctx.suggest(cmds, String(i.summary||'Apply these changes'));
@@ -5782,7 +5916,8 @@ async function runAgent({system, history=[], user, tools=[], model, effort='low'
     const past=history.map(m=>`${m.role==='user'?'GM':'You'}: ${typeof m.content==='string'?m.content:m.content.filter(b=>b.type==='text').map(b=>b.text).join('\n')}`).join('\n\n');
     const input=`${system}\n\n${past?'CONVERSATION SO FAR\n'+past+'\n\n':''}${user}`;
     const sTools=tools.map(t=>({name:t.name, description:t.description, inputSchema:t.input_schema,
-      execute:async inp=>{ const r=await t.run(inp,ctx); onTool&&onTool(t,inp,r); return r; }}));
+      execute:async inp=>{ try{ const r=await t.run(prepToolInput(t,inp),ctx); onTool&&onTool(t,inp,r); return r; }
+        catch(e){ onTool&&onTool(t,inp,null,String(e&&e.message||e)); throw e; } }}));
     try{
       const r=await SAMPLE(input,{onText:u=>onText&&onText(u.text), signal, modelTier:TIER_OF[model]||'default',
         ...(sTools.length?{tools:sTools}:{cache:false})});
@@ -5811,7 +5946,7 @@ async function runAgent({system, history=[], user, tools=[], model, effort='low'
       try{
         if(!t) throw new Error('no such tool');
         if(b.input&&b.input.__bad_json!==undefined) throw new Error('the tool input was not valid JSON');
-        out=await t.run(b.input||{}, ctx); onTool&&onTool(t,b.input,out);
+        out=await t.run(prepToolInput(t,b.input||{}), ctx); onTool&&onTool(t,b.input,out);
       }catch(e){ err=true; out=String(e&&e.message||e); onTool&&onTool(t,b.input,null,out); }
       results.push({type:'tool_result', tool_use_id:b.id, content:typeof out==='string'?out:JSON.stringify(out), ...(err?{is_error:true}:{})});
     }
@@ -6225,6 +6360,70 @@ function qmThumb(q){
   qmThumbs.set(q.id,url); return url;
 }
 
+
+/* =============================== toasts, shortcuts, welcome =============================== */
+/* a small note at the foot of the board, so a failed action is never silent
+   when the GM console is shut */
+let toastTimer=null;
+function toast(text,tone,act){
+  const t=$('toast');
+  t.innerHTML=`<span>${esc(text)}</span>`+(act?`<button class="btn">${esc(act.label)}</button>`:'');
+  t.className='show '+(tone||'');
+  if(act) t.querySelector('button').onclick=()=>{ t.className=''; act.run(); };
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.className='', act?7000:4500);
+}
+$('toast').addEventListener('click',e=>{ if(!e.target.closest('button')) $('toast').className=''; });
+
+const SHORTCUTS=[['n','next turn'],['c','combat tracker'],['d','dice tray'],['b','map builder'],['k','Claude'],['g','GM console'],['z','undo the last change'],['?','this list']];
+function typing(e){ const t=e.target; return t&&(t.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)); }
+addEventListener('keydown',e=>{
+  if(e.ctrlKey||e.metaKey||e.altKey||typing(e)) return;
+  if(!$('welcome').hidden||!$('csum').hidden) return;
+  const k=e.key.toLowerCase();
+  if(k==='n'&&S.initiative.length){ applyBatch([{do:'next'}]); toast(`Round ${S.round} · ${(S.initiative[S.active]?.name||'').replace(/ \d+$/,'')}'s turn`); }
+  else if(k==='c') openSide('combat');
+  else if(k==='d') openSide('dice');
+  else if(k==='b') openSide('build');
+  else if(k==='k') openSide('claude');
+  else if(k==='g') $('gmconsole').classList.toggle('show');
+  else if(k==='z'){ if(undoStack.length){ $('gmundo').click(); toast('Undone'); } else toast('Nothing to undo'); }
+  else if(e.key==='?') toast('Keys: '+SHORTCUTS.map(([a,b])=>a+' '+b).join(' · '));
+  else return;
+  e.preventDefault();
+});
+
+const WKEY='vtt-welcomed';
+function showWelcome(){
+  const heroes=['fighter','wizard','rogue','priest','dragon','lich','eyebeast'];
+  $('welcome').innerHTML=`<div class="wl-card" role="dialog" aria-labelledby="wl-h">
+    <div class="wl-heroes">${heroes.map((h,i)=>`<img alt="" src="${pixelArtURL(h)}" style="--i:${i}">`).join('')}</div>
+    <h2 id="wl-h">Welcome to the table</h2>
+    <p class="wl-lede">A battle map you can run from a phone: painted terrain, light and fog of war, a combat tracker that knows the rules, and Claude as your rules assistant or your whole Narrator.</p>
+    <div class="wl-steps">
+      <button class="wl-step" data-wl="build"><b>1</b><span><i>Pick a battlefield</i>Seven ready maps, or paint your own.</span></button>
+      <button class="wl-step" data-wl="combat"><b>2</b><span><i>Roll for initiative</i>Turns, HP, dying and the victory tally.</span></button>
+      <button class="wl-step" data-wl="claude"><b>3</b><span><i>Bring Claude</i>Ask a rules question, or hand over the story.</span></button>
+    </div>
+    <div class="wl-foot"><button class="btn primary" data-wl="go">Start playing</button>
+      <span class="dim">press ? for keys</span></div></div>`;
+  $('welcome').hidden=false;
+  $('welcome').querySelector('[data-wl="go"]').focus();
+}
+function closeWelcome(){ $('welcome').hidden=true; try{ localStorage.setItem(WKEY,'1'); }catch(e){} }
+$('welcome').addEventListener('click',e=>{
+  const b=e.target.closest('[data-wl]');
+  if(!b){ if(e.target===$('welcome')) closeWelcome(); return; }
+  closeWelcome();
+  const a=b.dataset.wl;
+  if(a!=='go') openSide(a,true);
+});
+addEventListener('keydown',e=>{ if(e.key==='Escape'&&!$('welcome').hidden) closeWelcome(); });
+function maybeWelcome(){
+  let seen=null; try{ seen=localStorage.getItem(WKEY); }catch(e){ seen='1'; }
+  const forced=/[?&]welcome\b/.test(location.search);
+  if(forced||(!seen&&!navigator.webdriver&&!location.hash)) showWelcome();   // automated test browsers skip it
+}
+
 /* =============================== boot =============================== */
 window.VTT={ apply:applyBatch, state:()=>S, stateForGM,
   vis:()=>visGrid, light:()=>lightGrid, world:()=>WORLD,
@@ -6247,6 +6446,7 @@ window.VTT={ apply:applyBatch, state:()=>S, stateForGM,
     if(hashData&&Array.isArray(hashData.batch)) applyBatch(hashData.batch);
   }
   startFeed();
+  maybeWelcome();
 })();
 </script>
 </body>
