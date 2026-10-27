@@ -53,7 +53,7 @@ still applies.
 | heal | `{"do":"heal","t":"K","n":5}` | |
 | hp | `{"do":"hp","t":"K","set":12}` | Also `"max":30` and `"delta":-3` |
 | status | `{"do":"status","t":"sa","st":"down"}` | `fresh`/`hurt`/`down`; sets HP to match |
-| cond | `{"do":"cond","t":"K","add":["prone"],"remove":["frightened"]}` | `"remove":"all"` clears; max 3 shown |
+| cond | `{"do":"cond","t":"K","add":["prone","frightened 2","burning 1d6",{"name":"slowed","value":1,"rounds":2}],"remove":["grabbed"]}` | A value rides on the name (`"frightened 2"`, `"burning 1d6"`) or as `value`; `rounds` makes it run out at the end of that many of the token's turns. Also `"value":{"frightened":2}` and `"rounds":{"slowed":2}` maps. `"remove":"all"` clears. Up to 8 per token; the token shows 2 and a `+n` |
 | spawn | `{"do":"spawn","token":{…},"init":{"after":2}}` | Token schema below; `init` optionally inserts an initiative chip |
 | remove | `{"do":"remove","t":"sa"}` | Also drops its initiative chip |
 | hide | `{"do":"hide","t":"amb"}` | Token leaves the board but keeps its state — stage ambushes with `"hidden":true` and reveal on the round they strike |
@@ -61,10 +61,17 @@ still applies.
 | aura | `{"do":"aura","t":"K","ft":10,"color":"blue"}` | Radius that follows the token (auras, torchlight, dragon breath range); `ft:0` clears |
 | ping | `{"do":"ping","at":"F9"}` | Expanding ring — "look here" |
 | roll | `{"do":"roll","dice":"2d6+3","label":"club"}` | Rolls on the board and logs it; players also have a d4–d100 tray |
-| marker | `{"do":"marker","marker":{"shape":"circle","at":"F6","ft":10,"color":"purple","label":"web"}}` | Shapes: `circle` (radius ft), `cone` (length ft + `dir`), `line` (length ft + `dir` + width `w`), `square` (side ft, from top-left). `dir`: `N/NE/E/…` or degrees. Colors: red orange yellow green blue purple white. Same `id` replaces. |
+| check | `{"do":"check","t":"K","mod":7,"dc":15,"label":"Athletics"}` | d20 + mod against a DC; the board shows the degree of success (PF2e: crit fail · fail · success · crit success, ±10 rule and nat 1/20 shift; 5e: pass/fail) |
+| save | `{"do":"save","t":"sa","mod":4,"dc":18,"damage":"6d6","cond":"frightened"}` | A saving throw. With `damage` it is a basic save (PF2e: double / full / half / none; 5e: full or half, `"half":false` for none). `cond` lands on a failure |
+| attack | `{"do":"attack","t":"K","target":"sa","bonus":9,"damage":"1d8+4","map":5}` | Rolls against the target's `ac` (or `"ac"` on the command); `map` is the multiple-attack penalty. Crits double damage in PF2e, double the dice in 5e. `strike` is the same command |
+| combat | `{"do":"combat"}` | Rolls initiative for every visible token from its `init` bonus and starts round 1. `"only":["K","sa"]` for some; `{"do":"combat","end":true}` ends it |
+| light (carried) | `{"do":"light","t":"K","carry":"torch"}` | A light that moves with the token and lifts fog as it goes: `torch` 20/40 ft · `lantern` 30/60 · `candle` 5/10 · `light` (the cantrip) 20/40 · `sunrod` 30/60 · `glow` 10/20. `"none"` puts it out. Or `{"carry":{"bright":10,"dim":20}}` |
+| mood | `{"do":"mood","type":"dusk"}` | A colour grade over the whole map: `none` `dawn` `day` `dusk` `night` `firelit` `eerie` `bloodmoon` `underdark` `frost`. Atmosphere only |
+| weather | `{"do":"weather","type":"storm","intensity":0.8}` | `none` `rain` `storm` `snow` `ash` `embers` `spores` `mist`; intensity 0.05–1. Atmosphere only: it changes no rules |
+| marker | `{"do":"marker","marker":{"shape":"circle","at":"F6","ft":10,"color":"purple","label":"web"}}` | Shapes: `circle` (radius ft), `cone` (length ft + `dir`), `line` (length ft + `dir` + width `w`), `square` (side ft, from top-left). `dir`: `N/NE/E/…` or degrees (0 east, 90 south). Colors: red orange yellow green blue purple white. Same `id` replaces. A square is inside when its centre is inside the drawn shape; the board state lists who each marker catches (`areas[].caught`), so a fireball is a marker and then one `save` per caught token. In the app, 📐 Area does this by hand |
 | unmark | `{"do":"unmark","id":"web"}` | Matches id or label; `{"do":"unmark"}` clears all |
 | wall | `{"do":"wall","from":"C3","to":"C9"}` | Lay a wall as a **run of squares** — the practical way to draw an irregular dungeon. `"kind"`: `wall` (stone) · `woodwall` (timber) · `lowwall` (ruined, cover only). `"remove":true` erases the same run. Straight or diagonal. |
-| zone | `{"do":"zone","from":"A1","to":"D16","type":"water"}` | Types: `water` (depth-shaded, foams at the shore) · `rough` · `swamp` · `lava` · `ice` · `fog` (translucent veil, blocks sight) · `dark` (magical darkness) · `wall` (blocks movement, sight and light; `pit` is the same thing) |
+| zone | `{"do":"zone","from":"A1","to":"D16","type":"water"}` | Types: `water` (depth-shaded, foams at the shore) · `rough` · `swamp` · `mud` · `lava` · `ice` · `chasm` (a drop; blocks movement) · `fog` (translucent veil, blocks sight) · `dark` (magical darkness) · `blight` · `blood` · `holy` (consecrated) · `pit` or `wall` (built masonry: blocks movement, sight and light) · `rock` (solid stone, the mass a cave or dungeon is carved from). Any floor name also works as a zone, to lay a patch of marble in a cobbled hall |
 | fow | `{"do":"fow","on":true}` | Fog of war master switch. Also `"ambient":"dark"`, `"reveal":"all"` (show the whole map), `"reset":true` (forget explored ground) |
 | ambient | `{"do":"ambient","light":"dark"}` | Scene light level: `bright` (daylight) · `dim` (dusk) · `dark` (night, dungeon). Also `"max":0.4` to set the glow ceiling (see below) |
 | vision | `{"do":"vision","t":"D","darkvision":60}` | Per-token sight. Also `{"vision":{"normal":30,"blind":true}}` and `"eyes":true/false` to add or drop a token from the party's shared view |
@@ -73,7 +80,7 @@ still applies.
 | clearlights | `{"do":"clearlights"}` | |
 | prop | `{"do":"prop","kind":"brazier","at":"C3"}` | Scene dressing drawn on the map — full list below. `w`/`h` span cells; `"blocks":true/false` overrides whether it stops line of sight; or `{"glyph":"🔥"}` for any emoji |
 | unprop | `{"do":"unprop","at":"C3"}` | |
-| ground | `{"do":"ground","ground":"grass"}` | `stone` (flagstones) · `wood` · `shingle` · `grass` · `sand` · `dirt` · `snow` |
+| ground | `{"do":"ground","ground":"grass"}` | `stone` (flagstones) · `cobble` · `crypt` · `marble` · `wood` · `ruin` · `cave` · `dirt` · `mud` · `grass` · `ash` · `boneyard` · `sand` · `snow` · `shingle` |
 | line | `{"do":"line","after":"E","label":"high tide"}` | Dashed rule below row E; omit `label` to remove |
 | legend | `{"do":"legend","legend":[["~ water","#6fa9ad"]]}` | |
 | init | `{"do":"init","order":[{"name":"Kira 19","t":"K"}]}` | Replace turn order; `t` links a chip to a token so it shows live HP |
@@ -100,6 +107,10 @@ brazier · forge · anvil · cauldron · chest · openchest · bookshelf · bed 
 throne · cage · rubble · bones · web · runes · trapdoor · grate (drain) ·
 lever · plate (pressure plate) · spikes · well · fountain · rug (carpet) ·
 chains · door · table · bar · chair · barrel · crate
+
+**Gravelands** — headstone · grave (2×1) · tomb (2×1) · mausoleum (2×2) ·
+gibbet · stake · banner · obelisk · deadtree (2×2) · skulls · pyre (2×1) ·
+sigil (2×2) · scorch. Light: torch · candles · lantern.
 
 **Cave** — stalagmite · crystal · pool · mushrooms
 
@@ -153,10 +164,18 @@ Two behaviours come free:
 Token fields: `kind` is `pc` | `ally` | `foe` | `mark`; `size` 1–3 squares
 (Large 2, Huge 3 — `at` is the top-left square); `hp` a number (means
 cur = max) or `{cur,max}`; `icon` any id from `TOKENS_index.md` (without the
-`tk-` prefix); `conds` up to 3 condition ids (with or without the `c-`
+`tk-` prefix); `conds` up to 8 condition ids (with or without the `c-`
 prefix); `aura` `{ft,color}`; `hidden: true` to stage it off-board until
 you `reveal` it; `vision` `{dark, normal, blind}` (or `darkvision: 60`) and
 `eyes` to control whose eyes the board renders from.
+
+Portraits and numbers: `art` puts a pixel-art portrait on the token instead
+of an icon — `skeleton ghoul wraith deathknight gravehound cultist crusader
+priest rogue wizard orc fighter elf dwarf zombie vampire lich spider rat ooze
+bat ranger`. `frame` rings it in `gold iron bone blood arcane verdigris
+silver`. `ac` and `init` (the initiative bonus) let `attack` and `combat`
+resolve without you passing numbers each time. A scene may also carry
+`"weather":{"type":"snow","intensity":0.5}`.
 
 ## Worlds: dungeons and settlements across many rooms
 
@@ -242,6 +261,33 @@ where the party is and what leads out.
 Sending a plain `scene` command leaves world mode and goes back to a single
 board.
 
+## Combat: what the board does by itself
+
+Once `combat` has rolled initiative the board keeps the bookkeeping, so the
+GM sends what happens and not the upkeep.
+
+- **End of a turn:** persistent damage (`burning`, `bleeding`, `poisoned`
+  with a dice value) hits, then in PF2e a DC 15 flat check ends it;
+  `frightened` drops by 1 (PF2e); conditions with `rounds` count down and
+  fall off.
+- **Start of a turn:** a dying PC makes its recovery check (PF2e: flat check
+  against DC 10 + dying, a crit moves two steps) or its death save (5e: three
+  successes stabilise, three failures kill, a natural 20 brings it back on
+  1 HP, a natural 1 counts twice).
+- **At 0 HP:** a PC goes unconscious and dying (PF2e: dying 1 plus wounded,
+  dying 2 on a crit; dead at dying 4 minus doomed). A foe is simply down.
+  Healing a dying PC clears dying (PF2e adds wounded). Damage to a dying PC
+  raises dying (PF2e) or counts as a failed death save (5e).
+- **Turn order:** dead creatures and downed foes lose their turns.
+- **The tally:** damage dealt and taken, hits, misses and crits per token,
+  counted from `attack`, `save` (pass `"by"` with the source token) and
+  `damage` (`"by"` too). When every visible foe in initiative is down the
+  board calls a victory; when every PC is down or dying, a defeat. Either
+  way a summary card names the MVP.
+
+Don't apply these by hand: a double frightened tick or a second dying step
+is a rules error the players will notice.
+
 ## Fog of war, line of sight & light
 
 Turn it on per scene with `"fow": true` (or `{"do":"fow","on":true}`) and set
@@ -298,3 +344,30 @@ A dark-dungeon opening looks like:
   are advisory.
 - Every applied command is echoed in the board's log; a bad command is
   skipped and logged, never fatal. `↩ undo` reverts the last batch.
+
+## Claude at the table: the ✦ Claude panel
+
+The board can call Claude itself, with your own API key or (as a Claude
+artifact) the viewer's account. It uses this same protocol through three
+tools, all validated by the board before anything changes:
+
+- `apply_commands {commands:[…]}` — the Narrator's hands. The batch is
+  checked first (known commands, real tokens, squares on the board, dice
+  that parse, no one ending inside a wall). Then it is applied **as one
+  transaction**: if any command fails, the board rolls back and the error
+  goes back to the model to fix. The result lists every roll and the board
+  afterwards.
+- `suggest_commands {commands:[…], summary}` — the rules assistant's way to
+  help. The same checks run, and the GM gets a card with an **Apply**
+  button. Nothing changes until they tap it.
+- `build_map {scene}` — the map maker. The scene is checked for unknown
+  assets and off-board squares, loaded, then checked again on the real grid
+  (tokens in rock or solid props, maps over 62% wall, tokens that can't
+  reach each other, foes within 3 squares of the party). Any problem rolls
+  it back and comes back as an error; success returns an ASCII picture of
+  what was built so the model can check its own layout.
+- `roll_dice {dice, label, dc}` — any roll no command covers, on the tray.
+
+Each prompt carries the board as compact JSON plus an ASCII map, so Claude
+always reasons from the real positions, HP, conditions and turn order.
+

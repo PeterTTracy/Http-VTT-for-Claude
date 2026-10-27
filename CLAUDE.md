@@ -33,7 +33,9 @@ repo root, then open `http://localhost:8000/`.
 - Grid refs are row-letter + column-number ("D7"); `normScene`/`normToken`
   convert external refs to internal 0-based `r`/`c`.
 - Verify with the regression suites: `node test/smoke.js`, `node test/fow.js`,
-  `node test/world.js`, `node test/mega.js` and `node test/tiles.js`
+  `node test/world.js`, `node test/mega.js`, `node test/tiles.js`,
+  `node test/builder.js`, `node test/claude.js`, `node test/combat.js`,
+  `node test/tools.js`, `node test/ambience.js` and `node test/area.js`
   (need Playwright;
   preinstalled in Claude Code web sessions — `NODE_PATH=/opt/node22/lib/node_modules`
   if it isn't local). It serves the repo, drives `window.VTT.apply([...])`,
@@ -65,3 +67,41 @@ repo root, then open `http://localhost:8000/`.
 - Terrain painters live in `drawGround`/`drawWater`/`drawLava`/… and use
   `rnd(r,c,k)` for per-tile detail plus `macro(r,c)` for smooth
   low-frequency variation — use both so floors don't look like static.
+- Floors, zones, props and portraits are all painted in code: floors in
+  `drawGround`, zones by type, props in `drawProp`, portraits from the
+  `PIXEL_ART` palette grids. `BLOCKING_ZONES` (`pit`, `rock`, `chasm`,
+  `lava`) is what the generators and the map maker treat as impassable.
+- The ✎ Build tab (`renderBuilder`, `paintAt`, `writeLayers`) paints into a
+  per-cell layer and writes it back as merged rectangles, so a painted map
+  stays a small scene. One stroke is one undo.
+- Quick maps are seeded generators in `QUICK_MAPS` (`qmBase` helpers,
+  `qmMake` retries until `qmConnected` passes). Keep them deterministic for a
+  seed; `test/builder.js` checks 25 seeds of each.
+- The ✦ Claude panel: `runAgent` runs one turn on either engine (the key
+  engine runs the tool loop itself; the page engine hands tools to the
+  artifact's `sample` capability). The model only changes the board through
+  `TOOL_APPLY` / `TOOL_SUGGEST` / `TOOL_BUILD`, which go through `checkCmds`
+  and `applyTransaction` (all-or-nothing, rolled back on error). Never send
+  `temperature`/`top_p`/`top_k` (the 2026-10-21 API refuses them) and never
+  force `tool_choice`.
+- The API key lives only under `vtt-anthropic-key` in sessionStorage or
+  localStorage (`getKey`/`setKey`/`forgetKey`). Never copy it into `S`,
+  `SET`, `CL`, a log line or the DOM; `test/claude.js` fails if it shows up
+  anywhere else.
+- Every Claude tool input goes through `prepToolInput` (a small JSON Schema
+  check, `schemaErrors`, with gentle coercion of a JSON string or a single
+  object) before `run`; a refusal must be an `Error` with a message the model
+  can act on. `test/tools.js` fuzzes 1200 malformed calls and fails if one
+  changes the board.
+- Combat bookkeeping lives between `VALUED` and `showSummary`: `addCond` /
+  `removeCond` (values in `tk.cval`, durations in `tk.cdur`), `turnHooks`
+  (end and start of turn), `deathRules`/`recoveryCheck`, `tallyHit` (credit
+  through `HP_CTX`), `checkVictory`. `hpDelta` is the one place HP changes,
+  so damage from anywhere reaches dying, the tally and victory.
+- Moods (`MOODS`) are composite layers drawn after darkness and before glow;
+  carried light (`CARRY`, `tk.light`) is just another source in
+  `computeLight`, so a moving token must refresh fog.
+- Area templates (`AREA`, `cellInMarker`, `caughtBy`) use the same shapes
+  `drawMarker` draws; the live preview is the marker id `_area`, which
+  `save` and `sceneToJSON` leave out. Batch saves go through `applyBatch`
+  so one undo takes back the whole area.

@@ -79,4 +79,22 @@ optional in commands):
 frightened · fleeing · prone · grabbed · restrained · immobilized ·
 blinded · stunned · confused · fatigued · poisoned · sickened · burning ·
 bleeding · slowed · quickened · enfeebled · drained · offguard · hidden ·
-invisible · dying · dead · blessed · delay · target
+invisible · dying · dead · blessed · delay · target · wounded ·
+unconscious · doomed · clumsy · stupefied · stable
+
+A value rides on the name: `"frightened 2"`, `"drained 1"`, `"burning 1d6"`
+(persistent damage for `burning`, `bleeding` and `poisoned`). The token badge
+shows the number.
+
+## Pixel-art portraits (`"art"`)
+
+Drawn in code (no image files). Use instead of `icon` for a painted portrait:
+
+skeleton · ghoul · wraith · deathknight · gravehound · cultist · crusader ·
+priest · rogue · wizard · orc · fighter · elf · dwarf · zombie · vampire ·
+lich · spider · rat · ooze · bat · ranger · goblin · kobold · bandit ·
+barbarian · bard · monk · druid · wolf · dragon · mummy · ghost · demon ·
+mimic · eyebeast
+
+Frames (`"frame"`): gold · iron · bone · blood · arcane · verdigris · silver
+
