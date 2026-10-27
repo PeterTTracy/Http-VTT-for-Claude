@@ -1076,7 +1076,7 @@ const GROUND_PAINTERS={
 /* every name drawGround understands, and so every name a zone may paint */
 const GROUNDS=new Set(['stone','wood','shingle','grass','dirt','snow','sand',...Object.keys(GROUND_PAINTERS)]);
 /* terrain hazards & dressings that are zones but not floors */
-const ZONE_TYPES=new Set(['water','pit','dark','rough','lava','swamp','ice','fog','chasm','blight','blood','holy']);
+const ZONE_TYPES=new Set(['water','pit','rock','dark','rough','lava','swamp','ice','fog','chasm','blight','blood','holy']);
 const LIVE_ZONES=new Set(['water','swamp','lava','fog','blight','holy']);
 const groundOf=ty=> ty==='ground'?S.ground : GROUNDS.has(ty)?ty : null;
 let floorGrid=[];
@@ -1192,6 +1192,32 @@ function drawHoly(r,c,t){
   }
 }
 
+/* solid rock: a cave wall, as opaque to sight as a built one but drawn as
+   living stone — faceted, with a pale lip wherever it meets open floor */
+function drawRock(r,c){
+  const x=gx(c), y=gy(r), mac=macro(r,c);
+  const open=(rr,cc)=> rr>=0&&cc>=0&&rr<ROWS&&cc<COLS && typeGrid[rr][cc]!=='rock' && typeGrid[rr][cc]!=='pit';
+  ctx.fillStyle=`hsl(${22+mac*8},8%,${8+mac*3}%)`; ctx.fillRect(x,y,CELL,CELL);
+  for(let i=0;i<4;i++){                                   // facets
+    const px2=x+rnd(r,c,i+800)*CELL, py2=y+rnd(r,c,i+804)*CELL, R=CELL*(.22+rnd(r,c,i+808)*.2);
+    ctx.fillStyle=`hsla(${20+rnd(r,c,i+812)*16},8%,${11+rnd(r,c,i+816)*8}%,.9)`;
+    ctx.beginPath();
+    for(let q=0;q<6;q++){ const a=q/6*6.283+rnd(r,c,i*6+q+820), rr2=R*(.6+rnd(r,c,i*6+q+850)*.4);
+      q?ctx.lineTo(px2+Math.cos(a)*rr2,py2+Math.sin(a)*rr2):ctx.moveTo(px2+Math.cos(a)*rr2,py2+Math.sin(a)*rr2); }
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(255,240,220,.05)'; ctx.lineWidth=1; ctx.stroke();
+  }
+  const lip=(x0,y0,x1,y1,nx,ny,k)=>{
+    ctx.fillStyle='hsl(28,9%,25%)'; ctx.beginPath(); ctx.moveTo(x0,y0);
+    for(let q=0;q<=6;q++){ const t2=q/6, d=2+rnd(r,c,k+q)*5;
+      ctx.lineTo(x0+(x1-x0)*t2+nx*d, y0+(y1-y0)*t2+ny*d); }
+    ctx.lineTo(x1,y1); ctx.closePath(); ctx.fill();
+  };
+  if(open(r-1,c)) lip(x,y,x+CELL,y,0,1,870);
+  if(open(r+1,c)) lip(x,y+CELL,x+CELL,y+CELL,0,-1,880);
+  if(open(r,c-1)) lip(x,y,x,y+CELL,1,0,890);
+  if(open(r,c+1)) lip(x+CELL,y,x+CELL,y+CELL,-1,0,900);
+}
 /* ---- the terrain cache: static squares are painted once per change, not
    seven times a second. Anything that moves (water, lava, fog, blight…)
    is still painted live on top. Invalidate with terrainDirty=true. ---- */
@@ -1200,6 +1226,7 @@ function paintCell(r,c,t){
   const ty=typeGrid[r][c];
   if(ty==='water')drawWater(r,c,t);
   else if(ty==='pit')drawWall(r,c);
+  else if(ty==='rock')drawRock(r,c);
   else if(ty==='dark')drawDark(r,c);
   else if(ty==='rough')drawRough(r,c);
   else if(ty==='lava')drawLava(r,c,t);
@@ -2421,7 +2448,7 @@ function portalDir(toRoom){                 // -1 down, +1 up, 0 same level
 /* Which way the wall through this square runs, so a door can sit in it the
    way a door does: leaf parallel to the wall, you pass through crosswise. */
 function wallRun(r,c){
-  const w=(rr,cc)=> rr>=0&&cc>=0&&rr<ROWS&&cc<COLS&&typeGrid[rr][cc]==='pit';
+  const w=(rr,cc)=> rr>=0&&cc>=0&&rr<ROWS&&cc<COLS&&(typeGrid[rr][cc]==='pit'||typeGrid[rr][cc]==='rock');
   const ns=(w(r-1,c)?1:0)+(w(r+1,c)?1:0);
   const ew=(w(r,c-1)?1:0)+(w(r,c+1)?1:0);
   return ns>ew?'NS' : ew>ns?'EW' : (ns?'NS':'EW');
@@ -2828,9 +2855,9 @@ function fov(oc,or,radius,blocks,out){
     castLight(oc,or,1,1,0,radius,xx,xy,yx,yy,out,blocks);
 }
 let solidGrid=[];
-const blocksSight=(c,r)=>typeGrid[r][c]==='pit'||solidGrid[r][c];   // walls & pillars
+const blocksSight=(c,r)=>typeGrid[r][c]==='pit'||typeGrid[r][c]==='rock'||solidGrid[r][c];   // walls, rock & pillars
 const blocksView =(c,r)=>{const t=typeGrid[r][c];
-  return t==='pit'||t==='fog'||solidGrid[r][c];};
+  return t==='pit'||t==='rock'||t==='fog'||solidGrid[r][c];};
 const AMB={bright:2, dim:1, dark:0};
 /* How much accumulated glow a square may show. Light *levels* are already
    capped by the rules (dark/dim/bright); this is the ceiling on the warm
@@ -3588,7 +3615,7 @@ function edgeArrival(edge,r,c,destId){
 function freeCellNear(room,r,c,taken){
   const fits=(rr,cc)=> rr>=0&&cc>=0&&rr<room.rows&&cc<room.cols &&
     !taken.has(rr+','+cc) &&
-    !room.zones.some(z=>z.type==='pit'&&rr>=z.r1&&rr<=z.r2&&cc>=z.c1&&cc<=z.c2);
+    !room.zones.some(z=>(z.type==='pit'||z.type==='rock')&&rr>=z.r1&&rr<=z.r2&&cc>=z.c1&&cc<=z.c2);
   if(fits(r,c)) return {r,c};
   for(let ring=1;ring<Math.max(room.rows,room.cols);ring++)
     for(let dr=-ring;dr<=ring;dr++)for(let dc=-ring;dc<=ring;dc++){
@@ -4049,7 +4076,7 @@ $('buildbtn').addEventListener('click',()=>openSide('build'));
 const measure=$('measure');
 const HAZARD={water:' (difficult ×2)', rough:' (difficult ×2)', swamp:' (difficult ×2)',
   pit:' (wall!)', lava:' (lava!)', ice:' (ice — slippery)', dark:' (darkness)', fog:' (obscured)',
-  chasm:' (chasm — a fall!)', blight:' (blight — sickening)', holy:' (consecrated)', mud:' (difficult)'};
+  chasm:' (chasm — a fall!)', rock:' (solid rock!)', blight:' (blight — sickening)', holy:' (consecrated)', mud:' (difficult)'};
 function feet(r0,c0,r1,c1){
   const dr=Math.abs(r1-r0), dc=Math.abs(c1-c0);
   const diag=Math.min(dr,dc), straight=Math.max(dr,dc)-diag;
@@ -4170,7 +4197,7 @@ function attachDrag(el, id){
     const r=clamp(pr-dragTok.offR, 0, ROWS-tk.size);
     const ty=typeGrid[r][c];
     const lk=isParty(tk)?linkAt(r,c):null;
-    const blocked=solidGrid[r]&&solidGrid[r][c]&&ty!=='pit';
+    const blocked=solidGrid[r]&&solidGrid[r][c]&&ty!=='pit'&&ty!=='rock';
     measure.textContent=`${tk.label}: ${refOf(dragTok.r0,dragTok.c0)} → ${refOf(r,c)} · ${feet(dragTok.r0,dragTok.c0,r,c)} ft${HAZARD[ty]||(blocked?' (blocked)':'')}`+
       (lk?`  ▸ ${WORLD.rooms[lk.to]?WORLD.rooms[lk.to].name:lk.to}`:'');
     dragTok.r=r; dragTok.c=c;
