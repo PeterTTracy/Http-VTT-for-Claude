@@ -80,3 +80,14 @@ frightened · fleeing · prone · grabbed · restrained · immobilized ·
 blinded · stunned · confused · fatigued · poisoned · sickened · burning ·
 bleeding · slowed · quickened · enfeebled · drained · offguard · hidden ·
 invisible · dying · dead · blessed · delay · target
+
+## Pixel-art portraits (`"art"`)
+
+Drawn in code (no image files). Use instead of `icon` for a painted portrait:
+
+skeleton · ghoul · wraith · deathknight · gravehound · cultist · crusader ·
+priest · rogue · wizard · orc · fighter · elf · dwarf · zombie · vampire ·
+lich · spider · rat · ooze · bat · ranger
+
+Frames (`"frame"`): gold · iron · bone · blood · arcane · verdigris · silver
+
