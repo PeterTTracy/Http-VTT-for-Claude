@@ -119,9 +119,9 @@
     100%{box-shadow:0 0 0 16px rgba(217,163,90,0)}}
   .token .badge{position:absolute; right:-3px; bottom:-3px;
     background:var(--panel); border:1.5px solid currentColor; border-radius:50%;
-    width:38%; height:38%; display:flex; align-items:center; justify-content:center;
-    font-size:45%; line-height:1}
-  .token .cond{position:absolute; top:-8%; width:34%; height:34%;
+    width:calc(38% / var(--sz,1)); height:calc(38% / var(--sz,1)); display:flex; align-items:center; justify-content:center;
+    font-size:calc(45% / var(--sz,1)); line-height:1}
+  .token .cond{position:absolute; top:calc(-8% / var(--sz,1)); width:calc(34% / var(--sz,1)); height:calc(34% / var(--sz,1));
     background:var(--panel); border:1.2px solid var(--steel); border-radius:50%;
     display:flex; align-items:center; justify-content:center; pointer-events:none;
     box-shadow:0 1px 2px rgba(0,0,0,.6)}
@@ -276,7 +276,15 @@
   .ptile:hover{border-color:#5d6a70; color:var(--text)}
   .ptile.on{border-color:var(--lamp); color:var(--lamp); box-shadow:0 0 0 1px var(--lamp) inset}
   .ptile.ic svg{width:30px; height:30px; fill:var(--bone)}
-  .qmaps .btn{flex:1 1 30%; font-size:11px; padding:6px 6px}
+  .qmaps{display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:5px 0}
+  .qmaps .btn.qm{display:flex; gap:7px; align-items:center; text-align:left; padding:5px; letter-spacing:0; min-width:0}
+  .qmaps .qm img{width:46px; height:46px; flex:none; border-radius:2px; image-rendering:pixelated;
+    box-shadow:0 0 0 1px #000, 0 1px 3px rgba(0,0,0,.6)}
+  .qmaps .qm span{display:flex; flex-direction:column; gap:2px; min-width:0}
+  .qmaps .qm b{font-weight:normal; font-size:11px; color:var(--text)}
+  .qmaps .qm i{font-style:normal; font-size:9.5px; line-height:1.3; color:var(--dim);
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+  .qmaps .qm:hover b{color:var(--lamp)}
   .pal-hint{padding:6px 2px}
   #fx{position:absolute; left:0; top:0; pointer-events:none; z-index:7}
   #viewport.painting{cursor:crosshair}
@@ -446,11 +454,11 @@ const DEFAULT_SCENE = {
   ],
   lights: [],
   tokens: [
-    {id:"K",  name:"Kira",   label:"K", at:"J5",  kind:"pc",  icon:"swordwoman", hp:{cur:24,max:24}},
-    {id:"B",  name:"Bren",   label:"B", at:"K7",  kind:"pc",  icon:"wizard",     hp:{cur:26,max:26}},
-    {id:"sa", name:"Skel A", label:"a", at:"D8",  kind:"foe", icon:"skeleton",   hp:{cur:13,max:13}},
-    {id:"sb", name:"Skel B", label:"b", at:"F11", kind:"foe", icon:"skeleton",   hp:{cur:13,max:13}, conds:["frightened"]},
-    {id:"og", name:"Ogre",   label:"O", at:"B13", kind:"foe", icon:"ogre", size:2, hp:{cur:50,max:50}},
+    {id:"K",  name:"Kira",   label:"K", at:"J5",  kind:"pc",  icon:"swordwoman", art:"fighter", frame:"gold", hp:{cur:24,max:24}, ac:18, init:7},
+    {id:"B",  name:"Bren",   label:"B", at:"K7",  kind:"pc",  icon:"wizard", art:"wizard", frame:"arcane", hp:{cur:26,max:26}, ac:15, init:4},
+    {id:"sa", name:"Skel A", label:"a", at:"D8",  kind:"foe", icon:"skeleton", art:"skeleton", frame:"bone", hp:{cur:13,max:13}, ac:14, init:6},
+    {id:"sb", name:"Skel B", label:"b", at:"F11", kind:"foe", icon:"skeleton", art:"skeleton", frame:"bone", hp:{cur:13,max:13}, ac:14, init:6, conds:["frightened"]},
+    {id:"og", name:"Ogre",   label:"O", at:"B13", kind:"foe", icon:"ogre", art:"orc", frame:"iron", size:2, hp:{cur:50,max:50}, ac:17, init:1},
   ],
   markers: [],
   initiative: [
@@ -3104,7 +3112,7 @@ function rebuildTypeGrid(){
 function place(el,tk){
   el.style.left=tk.c*CELL+CELL*0.06+'px'; el.style.top=tk.r*CELL+CELL*0.06+'px';
   el.style.width=CELL*tk.size-CELL*0.12+'px'; el.style.height=CELL*tk.size-CELL*0.12+'px';
-  el.style.fontSize=CELL*0.42*tk.size+'px';
+  el.style.fontSize=CELL*0.42*tk.size+'px'; el.style.setProperty('--sz', tk.size);   // badges stay one-square sized on big tokens
 }
 function updateToken(tk){
   const el=live.get(tk.id); if(!el) return;
@@ -4473,7 +4481,7 @@ function renderBuilder(){
   const wx=S.weather||{type:'none',intensity:.6};
   box.innerHTML=`
     <div class="h3">quick maps</div>
-    <div class="row2 qmaps">${QUICK_MAPS.map(q=>`<button class="btn" data-qmap="${q.id}" title="${esc(q.blurb)}">${q.icon} ${q.name}</button>`).join('')}</div>
+    <div class="qmaps">${QUICK_MAPS.map(q=>`<button class="btn qm" data-qmap="${q.id}" title="${esc(q.blurb)}"><img alt="" src="${qmThumb(q)}"><span><b>${q.icon} ${q.name}</b><i>${esc(QM_TAG[q.id]||'')}</i></span></button>`).join('')}</div>
     <div class="dim">a fresh layout every time · ↩ undo in the GM console brings the last map back</div>
     <div class="h3">paint</div>
     <div class="row2">${[['floor','▦ floor'],['terrain','≈ terrain'],['prop','♜ props'],['wall','▥ walls'],['light','☀ light'],['token','◉ tokens'],['erase','⌫ erase']]
@@ -5688,6 +5696,33 @@ function send(){
   n.value='';
   if(engine()==='key'&&!getKey()){ pushLog({k:'err', text:'Add your API key above first (or pick “this page” when this runs as an artifact).'}); return; }
   if(SET.cmode==='rules') askRules(q); else narrate(q);
+}
+
+/* quick-map previews: one fixed seed per generator, drawn as a tiny colour map */
+const QM_COL={stone:'#3b4044', cobble:'#433f39', crypt:'#363a3d', marble:'#6a6b6b', wood:'#5a4329', ruin:'#3f3d38',
+  cave:'#33302c', dirt:'#54452f', mud:'#3f3424', grass:'#33502e', ash:'#4a4643', boneyard:'#45403a', sand:'#77684a',
+  snow:'#aeb6bb', shingle:'#383c3f', water:'#1f4a52', swamp:'#2f3f2c', rough:'#55504a', ice:'#8cb0bf', lava:'#b44d1c',
+  chasm:'#060708', pit:'#6d685f', rock:'#141516', fog:'#727a7f', dark:'#0b0c0f', blight:'#4e4159', blood:'#64201c', holy:'#8a7a44'};
+const QM_TAG={graveyard:'headstones, a mausoleum, fog', crypt:'carved rooms, fog of war, dark', chapel:'a cult at the altar, pillars',
+  cave:'a black pool, crystals, webs', road:'pines, a ford, rain', village:'timber houses, embers', frozen:'thin ice, snow, slippery'};
+const qmThumbs=new Map();
+function qmThumb(q){
+  if(qmThumbs.has(q.id)) return qmThumbs.get(q.id);
+  let url='';
+  try{
+    const sc=normScene(q.make(7)), k=3, cv=document.createElement('canvas');
+    cv.width=sc.cols*k; cv.height=sc.rows*k;
+    const g=cv.getContext('2d');
+    g.fillStyle=QM_COL[sc.ground]||'#3b4044'; g.fillRect(0,0,cv.width,cv.height);
+    for(const z of sc.zones){ g.fillStyle=QM_COL[z.type]||'#555'; g.fillRect(z.c1*k,z.r1*k,(z.c2-z.c1+1)*k,(z.r2-z.r1+1)*k); }
+    for(const p of sc.props){ const [w,h]=[p.w||1,p.h||1];
+      g.fillStyle=propSolid(p)?'#9a8e78':LIGHT_PROPS[p.kind]?'#e0a95a':'#6f6556'; g.fillRect(p.c*k+.5,p.r*k+.5,w*k-1,h*k-1); }
+    for(const t of sc.tokens){ if(t.hidden) continue;
+      g.fillStyle=t.kind==='pc'?'#f0c070':t.kind==='ally'?'#7fc0a0':'#d0584a';
+      g.beginPath(); g.arc((t.c+t.size/2)*k,(t.r+t.size/2)*k,k*.75*t.size,0,7); g.fill(); }
+    url=cv.toDataURL();
+  }catch(e){}
+  qmThumbs.set(q.id,url); return url;
 }
 
 /* =============================== boot =============================== */
