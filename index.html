@@ -264,6 +264,23 @@
   .dhist li .n{font-weight:700; color:var(--bone); min-width:28px; text-align:right}
   .dhist li .w{color:var(--dim); flex:1}
   @media (max-width:520px){ .dicecast{flex-wrap:wrap} .tab{padding:6px 8px} }
+  /* map builder */
+  .h3.sub{margin:8px 0 4px; font-size:9px; border-bottom:none; color:#7c8a90}
+  .pgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(62px,1fr)); gap:5px}
+  .pgrid.icons{grid-template-columns:repeat(auto-fill,minmax(52px,1fr)); max-height:260px; overflow-y:auto}
+  .ptile{cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:2px; padding:3px;
+    background:#0b0e10; border:1px solid var(--grid); border-radius:4px; color:var(--dim); font:9.5px ui-monospace,monospace}
+  .ptile img{width:100%; aspect-ratio:1; object-fit:cover; border-radius:2px; image-rendering:auto}
+  .pgrid.art .ptile img{image-rendering:pixelated; background:radial-gradient(#2a3036,#12161a)}
+  .ptile span{max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .ptile:hover{border-color:#5d6a70; color:var(--text)}
+  .ptile.on{border-color:var(--lamp); color:var(--lamp); box-shadow:0 0 0 1px var(--lamp) inset}
+  .ptile.ic svg{width:30px; height:30px; fill:var(--bone)}
+  .qmaps .btn{flex:1 1 30%; font-size:11px; padding:6px 6px}
+  .pal-hint{padding:6px 2px}
+  #fx{position:absolute; left:0; top:0; pointer-events:none; z-index:7}
+  #viewport.painting{cursor:crosshair}
+  #viewport.painting .token{pointer-events:none}
   #inspector{display:none; width:min(96vw,860px); margin-top:8px; background:var(--panel);
     border:1px solid var(--grid); border-radius:4px; padding:8px 12px;
     font-family:ui-monospace,monospace; font-size:11.5px}
@@ -509,6 +526,12 @@ function normMarker(m){
   return {id:String(m.id||('m'+(++idSeq))), shape:m.shape||'circle', r:p.r, c:p.c,
     ft:m.ft||10, w:m.w||5, dir, color:m.color||'orange', label:m.label||''};
 }
+const WEATHERS=['none','rain','storm','snow','ash','embers','spores','mist'];
+function normWeather(w){
+  if(!w) return {type:'none', intensity:.6};
+  if(typeof w==='string') w={type:w};
+  return {type:WEATHERS.includes(w.type)?w.type:'none', intensity:clamp(+w.intensity||.6,.05,1)};
+}
 function normScene(inp){
   const sc=inp.scene||inp;   // tolerate {"scene":{...}} wrappers
   const rows=clamp(sc.rows||16,4,26), cols=clamp(sc.cols||16,4,26);
@@ -528,6 +551,7 @@ function normScene(inp){
       detail:e.detail||'', kind:e.kind||null, t:e.t||null})),
     active:0, round:sc.round||1,
     maxLight:sc.maxLight,
+    weather:normWeather(sc.weather),
     legend:sc.legend||[]};
   for(const tk of st.tokens){ tk.r=clamp(tk.r,0,rows-tk.size); tk.c=clamp(tk.c,0,cols-tk.size); }
   if(sc.active!==undefined){
@@ -3105,6 +3129,8 @@ function buildBoard(){
   rebuildTypeGrid(); computeVision(); applyTokenVisibility(); repaint();
   renderHeader(); renderChips(); renderLegend(); renderExits();
   sizeViewport();
+  if(!S.weather) S.weather=normWeather();
+  setWeather(S.weather.type, S.weather.intensity);
 }
 function renderHeader(){ $('h-title').textContent=S.header; $('h-sub').textContent=S.sub; }
 function renderLegend(){
@@ -3367,6 +3393,10 @@ function applyCmd(cmd){
     }
     refreshFOW();
     return `fog of war ${S.fow.on?'on':'off'} · ambient ${S.fow.ambient}`; }
+  case 'weather': {
+    S.weather=normWeather(cmd.type===undefined&&cmd.weather?cmd.weather:{type:cmd.type??'none', intensity:cmd.intensity??S.weather?.intensity});
+    setWeather(S.weather.type, S.weather.intensity);
+    return S.weather.type==='none'?'weather: clear':`weather: ${S.weather.type} (${Math.round(S.weather.intensity*100)}%)`; }
   case 'ambient':
     if(cmd.light||cmd.ambient) S.fow.ambient=cmd.light||cmd.ambient;
     if(cmd.max!==undefined) S.maxLight=clamp(cmd.max,0,1);
@@ -4219,6 +4249,712 @@ function attachDrag(el, id){
     e.stopPropagation();
   });
 }
+
+/* ======================= the asset library =======================
+   One canonical list of everything a map can be built from: floors,
+   terrain, props, portraits and icons. The map builder's palettes, the
+   quick-map generators and Claude's map maker all draw from this list,
+   which is what keeps a generated map looking like a hand-built one. */
+const ASSET_GROUNDS=[['stone','flagstone'],['cobble','cobbles'],['crypt','crypt tiles'],['marble','marble'],
+  ['wood','planks'],['ruin','ruined floor'],['cave','cave floor'],['dirt','dirt'],['mud','mud'],['grass','grass'],
+  ['ash','ash waste'],['boneyard','boneyard'],['sand','sand'],['snow','snow'],['shingle','shingle']];
+const ASSET_ZONES=[['water','water','difficult'],['swamp','swamp','difficult'],['rough','rubble','difficult'],
+  ['ice','ice','slippery'],['mud','mud','difficult (floor)'],['lava','lava','burns'],['chasm','chasm','a fall'],
+  ['pit','masonry wall','blocks sight'],['rock','solid rock','blocks sight'],['fog','fog','obscures'],
+  ['dark','magical darkness','no darkvision'],['blight','blight','sickening'],['blood','blood','dressing'],
+  ['holy','consecrated','dressing']];
+const ASSET_PROPS={
+  'gravelands':['headstone','grave','tomb','mausoleum','gibbet','stake','banner','obelisk','deadtree','skulls','bones','pyre','sigil','scorch'],
+  'light':['torch','candles','lantern','brazier','campfire','hearth','lamppost','crystal','runes'],
+  'dungeon':['door','pillar','statue','altar','sarcophagus','coffin','chest','openchest','cage','chains','rubble','web','trapdoor','grate','lever','plate','spikes','well','fountain','pool','stalagmite','throne'],
+  'furniture':['table','bar','chair','bed','bookshelf','rug','barrel','crate','sacks','cauldron','forge','anvil'],
+  'outdoors':['tree','pine','bush','rock','stump','log','reeds','mushrooms','haystack','tent','stall','wagon','boat','fence','signpost','trough'],
+};
+const PROP_SIZES={grave:[2,1],tomb:[2,1],mausoleum:[2,2],deadtree:[2,2],pyre:[2,1],sigil:[2,2],tree:[2,2],
+  wagon:[2,1],boat:[2,1],table:[2,1],bar:[3,1],bed:[1,2],sarcophagus:[2,1],tent:[2,2],stall:[2,1],rug:[2,2]};
+const ASSET_WALLS=[['wall','stone wall'],['woodwall','timber wall'],['lowwall','low wall (cover)']];
+const ASSET_ICONS=[...new Set([...document.querySelectorAll('symbol[id^="tk-"]')]
+  .map(s=>s.id.slice(3)).filter(id=>!id.startsWith('c-')))];
+const ALL_PROPS=new Set(Object.values(ASSET_PROPS).flat().concat(ASSET_WALLS.map(w=>w[0])));
+
+/* thumbnails: the real painters, run once into a small canvas */
+const thumbCache=new Map();
+function thumb(kind,what){
+  const key=what+':'+kind;
+  if(thumbCache.has(key)) return thumbCache.get(key);
+  const [w,h]=what==='prop'?(PROP_SIZES[kind]||[1,1]):[1,1];
+  const cvT=document.createElement('canvas'), sc=2;
+  cvT.width=CELL*w*sc; cvT.height=CELL*h*sc;
+  const keep={ctx, typeGrid, floorGrid, distGrid, solidGrid, ROWS, COLS};
+  ctx=cvT.getContext('2d'); ctx.setTransform(sc,0,0,sc,-MARGIN*sc,-MARGIN*sc);
+  ROWS=h; COLS=w;
+  const zt=what==='zone'?kind:'ground';
+  typeGrid=[...Array(h)].map(()=>Array(w).fill(zt)); floorGrid=[...Array(h)].map(()=>Array(w).fill(null));
+  distGrid=[...Array(h)].map(()=>Array(w).fill(2)); solidGrid=[...Array(h)].map(()=>Array(w).fill(false));
+  try{
+    const base=what==='ground'?kind:(['outdoors'].some(g=>ASSET_PROPS[g].includes(kind))?'grass':'stone');
+    for(let r=0;r<h;r++)for(let c=0;c<w;c++){
+      if(what==='zone'){ floorGrid[r][c]=null; paintCell(r,c,1.3); }
+      else drawGround(r,c,base);
+    }
+    if(what==='prop'){ ctx.fillStyle='rgba(0,0,0,.25)'; ctx.fillRect(MARGIN,MARGIN,CELL*w,CELL*h);
+      drawProp({kind, r:0, c:0, w, h}, 1.3); }
+  }catch(e){}
+  finally{ ({ctx, typeGrid, floorGrid, distGrid, solidGrid, ROWS, COLS}=keep); }
+  const url=cvT.toDataURL();
+  thumbCache.set(key,url); return url;
+}
+
+/* ======================= the map builder =======================
+   Paint floors and terrain, stamp props and walls, drop lights and tokens
+   straight onto the board. A stroke is one undo step. Terrain is kept as
+   two per-square layers (floor, and whatever sits on it) and written back
+   as the fewest rectangles that cover them, so a painted map stays as
+   small as a hand-written one. */
+const BUILD={tool:null, pick:{floor:'cobble', terrain:'water', prop:'headstone', wall:'wall', token:'skeleton'},
+  brush:1, tokKind:'foe', tokName:'', tokHp:'', tokAc:'', iconFilter:'', stroke:null};
+function setBuildTool(tool){
+  BUILD.tool=tool;
+  viewport.classList.toggle('painting', !!tool);
+  document.querySelectorAll('#p-build [data-tool]').forEach(b=>b.classList.toggle('on', b.dataset.tool===tool));
+  if(SIDE_TAB==='build') renderPalette();
+}
+function terrainLayers(){
+  const F=[...Array(ROWS)].map((_,r)=>Array.from({length:COLS},(_,c)=>floorGrid[r]&&floorGrid[r][c]||null));
+  const Z=[...Array(ROWS)].map((_,r)=>Array.from({length:COLS},(_,c)=>{
+    const t=typeGrid[r][c]; return t==='ground'||GROUNDS.has(t)?null:t; }));
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++) if(typeGrid[r][c]==='ground') F[r][c]=null;
+  return {F,Z};
+}
+function rectsOf(grid){                                    // greedy cover by rectangles
+  const out=[], used=grid.map(row=>row.map(v=>v===null));
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(used[r][c]) continue;
+    const v=grid[r][c]; let c2=c;
+    while(c2+1<COLS&&!used[r][c2+1]&&grid[r][c2+1]===v) c2++;
+    let r2=r;
+    for(;;){ const nr=r2+1; if(nr>=ROWS) break;
+      let ok=true; for(let k=c;k<=c2;k++) if(used[nr][k]||grid[nr][k]!==v){ ok=false; break; }
+      if(!ok) break; r2=nr; }
+    for(let rr=r;rr<=r2;rr++)for(let k=c;k<=c2;k++) used[rr][k]=true;
+    out.push({r1:r,c1:c,r2,c2,type:v});
+  }
+  return out;
+}
+function writeLayers(L){
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++) if(L.F[r][c]===S.ground) L.F[r][c]=null;
+  S.zones=[...rectsOf(L.F), ...rectsOf(L.Z)];
+  rebuildTypeGrid();
+}
+function brushCells(r,c){
+  const out=[], n=BUILD.brush, o=Math.floor((n-1)/2);
+  for(let dr=0;dr<n;dr++)for(let dc=0;dc<n;dc++){
+    const rr=r-o+dr, cc=c-o+dc; if(rr>=0&&cc>=0&&rr<ROWS&&cc<COLS) out.push([rr,cc]); }
+  return out;
+}
+function cellFromEvent(e){
+  const rect=board.getBoundingClientRect();
+  const c=Math.floor((e.clientX-rect.left)/rect.width*COLS), r=Math.floor((e.clientY-rect.top)/rect.height*ROWS);
+  return (r<0||c<0||r>=ROWS||c>=COLS)?null:{r,c};
+}
+function paintAt(r,c){
+  const st=BUILD.stroke, key=r+','+c;
+  if(st.done.has(key)) return; st.done.add(key);
+  const t=BUILD.tool;
+  if(t==='floor'||t==='terrain'||t==='erase'){
+    for(const [rr,cc] of brushCells(r,c)){
+      if(t==='floor'){ st.L.F[rr][cc]=BUILD.pick.floor; st.L.Z[rr][cc]=null; }
+      else if(t==='terrain'){
+        const z=BUILD.pick.terrain;
+        if(GROUNDS.has(z)){ st.L.F[rr][cc]=z; st.L.Z[rr][cc]=null; } else st.L.Z[rr][cc]=z; }
+      else{ st.L.F[rr][cc]=null; st.L.Z[rr][cc]=null;
+        S.props=S.props.filter(p=>!(rr>=p.r&&rr<p.r+(p.h||1)&&cc>=p.c&&cc<p.c+(p.w||1)) || !p.kind);
+        S.lights=S.lights.filter(L=>!(L.r===rr&&L.c===cc)); }
+      st.n++;
+    }
+    writeLayers(st.L); repaint();
+  } else if(t==='prop'){
+    const kind=BUILD.pick.prop, [w,h]=PROP_SIZES[kind]||[1,1];
+    if(S.props.some(p=>p.kind===kind&&p.r===r&&p.c===c)) return;
+    S.props=S.props.filter(p=>!(p.r===r&&p.c===c&&p.kind));
+    S.props.push({kind, r:clamp(r,0,ROWS-h), c:clamp(c,0,COLS-w), ...(w>1?{w}:{}), ...(h>1?{h}:{})});
+    st.n++; rebuildTypeGrid(); repaint();
+  } else if(t==='wall'){
+    const kind=BUILD.pick.wall, isW=q=>['wall','woodwall','lowwall'].includes(q.kind);
+    S.props=S.props.filter(q=>!(isW(q)&&q.r===r&&q.c===c));
+    S.props.push({kind, r, c}); st.n++; rebuildTypeGrid(); repaint();
+  } else if(t==='light'){
+    if(!S.lights.some(L=>L.r===r&&L.c===c)){ S.lights.push({r,c,bright:20,dim:40,rad:2.2}); st.n++; }
+    computeVision(); repaint();
+  } else if(t==='token'){
+    if(st.n) return;                                       // one token per tap
+    const pick=BUILD.pick.token, isArt=!!PIXEL_ART[pick];
+    const base=(BUILD.tokName||pick.replace(/^\w/,ch=>ch.toUpperCase()));
+    let n=1; while(S.tokens.some(x=>x.name===(n>1||S.tokens.some(y=>y.name===base)?base+' '+n:base))) n++;
+    const name=n>1?base+' '+n:base;
+    const id=(base.replace(/[^A-Za-z0-9]/g,'').slice(0,6)||'t')+(n>1?n:'')+'_'+(++idSeq);
+    const hp=+BUILD.tokHp||null, ac=+BUILD.tokAc||null;
+    applyBatch([{do:'spawn', token:{id, name, label:n>1?String(n):name[0].toUpperCase(), kind:BUILD.tokKind,
+      at:refOf(r,c), ...(isArt?{art:pick}:{icon:pick}), ...(hp?{hp}:{}), ...(ac?{ac}:{})}}]);
+    st.n++; st.skipUndo=true;
+  }
+}
+function strokeStart(e){
+  if(!BUILD.tool||e.button>0) return;
+  const cell=cellFromEvent(e); if(!cell) return;
+  e.stopPropagation(); e.preventDefault();
+  if(BUILD.tool!=='token') undoStack=[deep(S)];
+  BUILD.stroke={done:new Set(), n:0, L:terrainLayers(), id:e.pointerId};
+  try{ viewport.setPointerCapture(e.pointerId); }catch(_){}
+  paintAt(cell.r,cell.c);
+}
+function strokeMove(e){
+  const st=BUILD.stroke; if(!st||e.pointerId!==st.id) return;
+  e.stopPropagation();
+  const cell=cellFromEvent(e); if(cell) paintAt(cell.r,cell.c);
+  if(cell) measure.textContent=`✎ ${BUILD.tool} · ${refOf(cell.r,cell.c)}`;
+}
+function strokeEnd(e){
+  const st=BUILD.stroke; if(!st||e.pointerId!==st.id) return;
+  e.stopPropagation();
+  BUILD.stroke=null;
+  if(st.n&&!st.skipUndo){
+    rebuildTypeGrid(); refreshFOW(); save();
+    logLine(`✎ ${BUILD.tool} ×${st.n}${BUILD.tool==='erase'?'':' · '+(BUILD.pick[BUILD.tool]||'')}`);
+  }
+}
+viewport.addEventListener('pointerdown', strokeStart, {capture:true});
+viewport.addEventListener('pointermove', strokeMove, {capture:true});
+viewport.addEventListener('pointerup', strokeEnd, {capture:true});
+viewport.addEventListener('pointercancel', strokeEnd, {capture:true});
+
+function renderBuilder(){
+  const box=$('p-build');
+  const opt=(v,l,cur)=>`<option value="${v}"${v===cur?' selected':''}>${l}</option>`;
+  const wx=S.weather||{type:'none',intensity:.6};
+  box.innerHTML=`
+    <div class="h3">quick maps</div>
+    <div class="row2 qmaps">${QUICK_MAPS.map(q=>`<button class="btn" data-qmap="${q.id}" title="${esc(q.blurb)}">${q.icon} ${q.name}</button>`).join('')}</div>
+    <div class="dim">a fresh layout every time · ↩ undo in the GM console brings the last map back</div>
+    <div class="h3">paint</div>
+    <div class="row2">${[['floor','▦ floor'],['terrain','≈ terrain'],['prop','♜ props'],['wall','▥ walls'],['light','☀ light'],['token','◉ tokens'],['erase','⌫ erase']]
+      .map(([t,l])=>`<button class="btn seg" data-tool="${t}">${l}</button>`).join('')}</div>
+    <div class="row2"><span class="dim">brush</span>${[1,2,3].map(n=>`<button class="btn seg${BUILD.brush===n?' on':''}" data-brush="${n}">${n}×${n}</button>`).join('')}
+      <span class="dim" style="margin-left:auto">tap or drag on the map</span></div>
+    <div id="palette"></div>
+    <div class="h3">atmosphere</div>
+    <div class="row2"><span class="dim">weather</span>
+      <select class="inp" id="bweather">${['none','rain','storm','snow','ash','embers','spores','mist'].map(w=>opt(w,w,wx.type)).join('')}</select>
+      <input type="range" id="bwint" min="0.1" max="1" step="0.05" value="${wx.intensity??.6}" style="flex:1;accent-color:var(--lamp)" aria-label="weather intensity"></div>
+    <div class="row2"><span class="dim">light</span>
+      <select class="inp" id="bamb">${['bright','dim','dark'].map(a=>opt(a,a,S.fow.ambient)).join('')}</select>
+      <label class="tog"><input type="checkbox" id="bfow"${S.fow.on?' checked':''}> fog of war</label></div>
+    <div class="h3">this map</div>
+    <div class="row2"><input class="inp" id="btitle" value="${esc(S.header)}" style="flex:2" aria-label="map title">
+      <input class="inp" id="bsub" value="${esc(S.sub)}" style="flex:2" aria-label="subtitle"></div>
+    <div class="row2"><span class="dim">base floor</span>
+      <select class="inp" id="bground">${ASSET_GROUNDS.map(([g,l])=>opt(g,l,S.ground)).join('')}</select>
+      <span class="dim">size</span><input class="inp" id="brows" value="${ROWS}" style="width:44px" inputmode="numeric" aria-label="rows">×
+      <input class="inp" id="bcols" value="${COLS}" style="width:44px" inputmode="numeric" aria-label="columns">
+      <button class="btn" id="bresize">resize</button></div>
+    <div class="row2"><button class="btn" id="bblank">new blank map</button>
+      <button class="btn" id="bcopy">⧉ copy map JSON</button></div>`;
+  renderPalette();
+}
+function renderPalette(){
+  const box=$('palette'); if(!box) return;
+  const t=BUILD.tool;
+  const tile=(id,url,label,on,attr)=>`<button class="ptile${on?' on':''}" ${attr}="${esc(id)}" title="${esc(label)}">`+
+    `<img alt="" src="${url}"><span>${esc(label)}</span></button>`;
+  let html='';
+  if(!t) html='<div class="dim pal-hint">pick a tool above — the palette of what it paints appears here.</div>';
+  else if(t==='floor') html='<div class="pgrid">'+ASSET_GROUNDS.map(([g,l])=>tile(g,thumb(g,'ground'),l,BUILD.pick.floor===g,'data-pick')).join('')+'</div>';
+  else if(t==='terrain') html='<div class="pgrid">'+ASSET_ZONES.map(([z,l,n])=>tile(z,GROUNDS.has(z)?thumb(z,'ground'):thumb(z,'zone'),l+' · '+n,BUILD.pick.terrain===z,'data-pick')).join('')+'</div>';
+  else if(t==='prop') html=Object.entries(ASSET_PROPS).map(([grp,ks])=>`<div class="h3 sub">${grp}</div><div class="pgrid">`+
+    ks.map(k=>tile(k,thumb(k,'prop'),k,BUILD.pick.prop===k,'data-pick')).join('')+'</div>').join('');
+  else if(t==='wall') html='<div class="pgrid">'+ASSET_WALLS.map(([k,l])=>tile(k,thumb(k,'prop'),l,BUILD.pick.wall===k,'data-pick')).join('')+'</div>';
+  else if(t==='light') html='<div class="dim pal-hint">tap squares to hang a light there (bright 20 ft, dim 40 ft). Erase takes lights away. Set the room to dim or dark below to see them work.</div>';
+  else if(t==='erase') html='<div class="dim pal-hint">erasing puts the base floor back and lifts props and lights off the squares you touch. Tokens stay; remove one from its inspector.</div>';
+  else if(t==='token'){
+    const icons=ASSET_ICONS.filter(i=>!BUILD.iconFilter||i.includes(BUILD.iconFilter.toLowerCase())).slice(0,BUILD.iconFilter?80:40);
+    html=`<div class="row2">${['pc','ally','foe','mark'].map(k=>`<button class="btn seg${BUILD.tokKind===k?' on':''}" data-tokkind="${k}">${k}</button>`).join('')}</div>
+      <div class="row2"><input class="inp" id="btname" placeholder="name (optional)" value="${esc(BUILD.tokName)}" style="flex:2">
+      <input class="inp" id="bthp" placeholder="hp" value="${esc(BUILD.tokHp)}" style="width:48px" inputmode="numeric">
+      <input class="inp" id="btac" placeholder="AC" value="${esc(BUILD.tokAc)}" style="width:48px" inputmode="numeric"></div>
+      <div class="h3 sub">portraits</div><div class="pgrid art">`+
+      Object.keys(PIXEL_ART).map(k=>tile(k,pixelArtURL(k),k,BUILD.pick.token===k,'data-pick')).join('')+`</div>
+      <div class="h3 sub">icons</div><input class="inp" id="bticon" placeholder="search ${ASSET_ICONS.length} icons…" value="${esc(BUILD.iconFilter)}" style="width:100%;margin-bottom:6px">
+      <div class="pgrid icons">`+icons.map(i=>`<button class="ptile ic${BUILD.pick.token===i?' on':''}" data-pick="${esc(i)}" title="${esc(i)}"><svg><use href="#tk-${esc(i)}"/></svg><span>${esc(i)}</span></button>`).join('')+'</div>';
+  }
+  box.innerHTML=html;
+}
+$('p-build').addEventListener('click',e=>{
+  const q=e.target.closest('[data-qmap]');
+  if(q){ const gen=QUICK_MAPS.find(m=>m.id===q.dataset.qmap); applyBatch([{do:'scene', scene:gen.make(Date.now()%1e9)}]);
+    renderBuilder(); logLine('✎ quick map: '+gen.name); return; }
+  const tb=e.target.closest('[data-tool]');
+  if(tb){ setBuildTool(BUILD.tool===tb.dataset.tool?null:tb.dataset.tool); return; }
+  const br=e.target.closest('[data-brush]');
+  if(br){ BUILD.brush=+br.dataset.brush; document.querySelectorAll('[data-brush]').forEach(b=>b.classList.toggle('on',b===br)); return; }
+  const pk=e.target.closest('[data-pick]');
+  if(pk){ BUILD.pick[BUILD.tool]=pk.dataset.pick; renderPalette(); return; }
+  const tk=e.target.closest('[data-tokkind]');
+  if(tk){ BUILD.tokKind=tk.dataset.tokkind; renderPalette(); return; }
+  const id=e.target.id;
+  if(id==='bresize'){
+    const rows=clamp(+$('brows').value||ROWS,4,26), cols=clamp(+$('bcols').value||COLS,4,26);
+    const sc=deep(S); sc.rows=rows; sc.cols=cols;
+    applyBatch([{do:'scene', scene:sceneToJSON(sc)}]); renderBuilder(); }
+  if(id==='bblank'){ applyBatch([{do:'scene', scene:{header:'Untitled map', sub:'1 square = 5 ft', rows:ROWS, cols:COLS,
+    ground:S.ground, tokens:[]}}]); renderBuilder(); }
+  if(id==='bcopy') toClipboard(JSON.stringify({scene:sceneToJSON(S)}),'map JSON');
+});
+$('p-build').addEventListener('change',e=>{
+  const id=e.target.id;
+  if(id==='bweather'||id==='bwint') applyBatch([{do:'weather', type:$('bweather').value, intensity:+$('bwint').value}]);
+  if(id==='bamb') applyBatch([{do:'ambient', light:$('bamb').value}]);
+  if(id==='bfow') applyBatch([{do:'fow', on:$('bfow').checked}]);
+  if(id==='bground') applyBatch([{do:'ground', ground:$('bground').value}]);
+  if(id==='btitle'||id==='bsub') applyBatch([{do:'title', header:$('btitle').value, sub:$('bsub').value}]);
+});
+$('p-build').addEventListener('input',e=>{
+  const id=e.target.id;
+  if(id==='btname') BUILD.tokName=e.target.value;
+  if(id==='bthp') BUILD.tokHp=e.target.value;
+  if(id==='btac') BUILD.tokAc=e.target.value;
+  if(id==='bticon'){ BUILD.iconFilter=e.target.value.trim(); const pos=e.target.selectionStart; renderPalette();
+    const n=$('bticon'); n.focus(); n.setSelectionRange(pos,pos); }
+});
+/* the live state written back out as a scene the GM protocol accepts */
+function sceneToJSON(st){
+  const ref=(r,c)=>refOf(r,c);
+  return {header:st.header, sub:st.sub, ground:st.ground, rows:st.rows, cols:st.cols,
+    zones:st.zones.map(z=>({from:ref(z.r1,z.c1), to:ref(z.r2,z.c2), type:z.type})),
+    ...(st.line?{line:{after:LETTERS[st.line.afterRow], label:st.line.label}}:{}),
+    props:st.props.map(({r,c,...p})=>({...p, at:ref(r,c)})),
+    lights:st.lights.map(L=>({at:ref(L.r,L.c), ...(L.bright!==undefined?{bright:L.bright,dim:L.dim}:{rad:L.rad})})),
+    fow:{on:st.fow.on, ambient:st.fow.ambient},
+    ...(st.weather&&st.weather.type!=='none'?{weather:st.weather}:{}),
+    tokens:st.tokens.map(({r,c,...t})=>({...t, at:ref(r,c), conds:t.conds})),
+    markers:st.markers.map(({r,c,...m})=>({...m, at:ref(r,c)})),
+    initiative:st.initiative, round:st.round, active:st.active, legend:st.legend};
+}
+
+/* ======================= weather =======================
+   Particles on a canvas over the board: rain (and storms, with lightning),
+   snow, falling ash, rising embers, drifting spores and mist. Purely
+   atmosphere — it changes nothing about sight or movement. */
+const fxCv=document.createElement('canvas'); fxCv.id='fx';
+$('stage').appendChild(fxCv);
+const fx=fxCv.getContext('2d');
+let fxParts=[], fxType='none', fxInt=0, fxRAF=0, fxLast=0, fxFlash=0;
+const FX_KINDS=WEATHERS;
+function setWeather(type,intensity){
+  fxType=FX_KINDS.includes(type)?type:'none'; fxInt=clamp(+intensity||.6,0.05,1);
+  fxCv.width=W*dpr; fxCv.height=H*dpr; fxCv.style.width=W+'px'; fxCv.style.height=H+'px';
+  fx.setTransform(dpr,0,0,dpr,0,0);
+  const area=(W*H)/(900*900);
+  const n={none:0, rain:320, storm:520, snow:220, ash:200, embers:90, spores:70, mist:14}[fxType];
+  fxParts=Array.from({length:Math.round(n*fxInt*area)},()=>spawnFx(true));
+  cancelAnimationFrame(fxRAF);
+  fx.clearRect(0,0,W,H);
+  if(fxType!=='none'){ fxLast=performance.now(); if(reduceMotion) drawFx(0); else fxRAF=requestAnimationFrame(tickFx); }
+}
+function spawnFx(any){
+  const x=Math.random()*W, y=any?Math.random()*H:(fxType==='embers'?H+5:-10);
+  switch(fxType){
+    case 'rain': case 'storm': return {x, y, v:520+Math.random()*260, l:9+Math.random()*9, a:.18+Math.random()*.25};
+    case 'snow': return {x, y, v:24+Math.random()*30, r:.8+Math.random()*1.9, ph:Math.random()*6.3, a:.5+Math.random()*.4};
+    case 'ash': return {x, y, v:14+Math.random()*22, r:.7+Math.random()*1.6, ph:Math.random()*6.3, a:.25+Math.random()*.35, rot:Math.random()*3};
+    case 'embers': return {x, y, v:30+Math.random()*50, r:.8+Math.random()*1.4, ph:Math.random()*6.3, life:1};
+    case 'spores': return {x, y, vx:(Math.random()-.5)*12, vy:(Math.random()-.5)*12, r:.8+Math.random()*1.2, ph:Math.random()*6.3};
+    case 'mist': return {x:any?x:-200, y, v:8+Math.random()*12, R:90+Math.random()*120, a:.04+Math.random()*.05};
+  }
+  return {x,y};
+}
+function tickFx(now){
+  const dt=Math.min(.05,(now-fxLast)/1000); fxLast=now;
+  const wind=fxType==='storm'?.35:.18;
+  for(const p of fxParts){
+    switch(fxType){
+      case 'rain': case 'storm': p.y+=p.v*dt; p.x+=p.v*wind*dt; break;
+      case 'snow': p.y+=p.v*dt; p.x+=Math.sin(now/900+p.ph)*12*dt; break;
+      case 'ash': p.y+=p.v*dt; p.x+=(Math.sin(now/1300+p.ph)*16+6)*dt; p.rot+=dt; break;
+      case 'embers': p.y-=p.v*dt; p.x+=Math.sin(now/500+p.ph)*20*dt; p.life-=dt*.25; break;
+      case 'spores': p.x+=p.vx*dt+Math.sin(now/1500+p.ph)*6*dt; p.y+=p.vy*dt+Math.cos(now/1700+p.ph)*6*dt; break;
+      case 'mist': p.x+=p.v*dt; break;
+    }
+    const out=p.y>H+20||p.y<-30||p.x>W+(fxType==='mist'?260:20)||p.x<-280||(p.life!==undefined&&p.life<=0);
+    if(out) Object.assign(p, spawnFx(false));
+  }
+  if(fxType==='storm'&&Math.random()<dt*.18) fxFlash=1;
+  drawFx(now);
+  fxRAF=requestAnimationFrame(tickFx);
+}
+function drawFx(now){
+  fx.clearRect(0,0,W,H);
+  if(fxType==='storm'){ fx.fillStyle='rgba(8,12,22,.18)'; fx.fillRect(0,0,W,H); }
+  if(fxType==='ash'){ fx.fillStyle='rgba(40,34,30,.10)'; fx.fillRect(0,0,W,H); }
+  for(const p of fxParts){
+    switch(fxType){
+      case 'rain': case 'storm':
+        fx.strokeStyle=`rgba(175,195,215,${p.a})`; fx.lineWidth=1;
+        fx.beginPath(); fx.moveTo(p.x,p.y); fx.lineTo(p.x-p.l*.3,p.y-p.l); fx.stroke(); break;
+      case 'snow': fx.fillStyle=`rgba(240,246,255,${p.a})`; fx.beginPath(); fx.arc(p.x,p.y,p.r,0,7); fx.fill(); break;
+      case 'ash': fx.save(); fx.translate(p.x,p.y); fx.rotate(p.rot); fx.fillStyle=`rgba(200,192,180,${p.a})`;
+        fx.fillRect(-p.r,-p.r*.6,p.r*2,p.r*1.2); fx.restore(); break;
+      case 'embers': { const f=.6+.4*Math.sin(now/90+p.ph);
+        fx.fillStyle=`rgba(255,${120+f*80|0},40,${Math.max(0,p.life)*f})`; fx.beginPath(); fx.arc(p.x,p.y,p.r,0,7); fx.fill();
+        fx.fillStyle=`rgba(255,140,40,${Math.max(0,p.life)*.15})`; fx.beginPath(); fx.arc(p.x,p.y,p.r*4,0,7); fx.fill(); break; }
+      case 'spores': fx.fillStyle=`rgba(170,240,150,${.35+.25*Math.sin(now/600+p.ph)})`; fx.beginPath(); fx.arc(p.x,p.y,p.r,0,7); fx.fill(); break;
+      case 'mist': { const g=fx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.R);
+        g.addColorStop(0,`rgba(200,210,220,${p.a})`); g.addColorStop(1,'rgba(200,210,220,0)');
+        fx.fillStyle=g; fx.fillRect(p.x-p.R,p.y-p.R,p.R*2,p.R*2); break; }
+    }
+  }
+  if(fxFlash>0){ fx.fillStyle=`rgba(225,235,255,${fxFlash*.32})`; fx.fillRect(0,0,W,H); fxFlash=Math.max(0,fxFlash-.06); }
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden) cancelAnimationFrame(fxRAF);
+  else if(fxType!=='none'&&!reduceMotion){ fxLast=performance.now(); fxRAF=requestAnimationFrame(tickFx); }
+});
+
+/* ======================= quick maps =======================
+   Seeded generators, one per kind of place. Each one lays out a grid of
+   floors and terrain, dresses it from the asset library, drops in the
+   party and a fitting band of foes, and checks that every token can walk
+   to every other before it hands the scene over. The same seed always
+   gives the same map. */
+function mulberry32(a){ return ()=>{ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+const BLOCKING_ZONES=new Set(['pit','rock','chasm','lava']);
+const PARTY=[{id:'G',name:'Grit',art:'fighter',hp:30,ac:18,init:7,frame:'gold'},
+  {id:'W',name:'Wick',art:'rogue',hp:22,ac:17,init:9,darkvision:60},
+  {id:'H',name:'Hettie',art:'priest',hp:20,ac:16,init:5}];
+function qmBase(rows,cols,ground,seed){
+  const R=mulberry32(seed||1);
+  const M={rows,cols,ground,R,
+    F:[...Array(rows)].map(()=>Array(cols).fill(null)),
+    Z:[...Array(rows)].map(()=>Array(cols).fill(null)),
+    props:[], lights:[], tokens:[], occ:new Set(), solid:new Set(),
+    ri:(a,b)=>a+Math.floor(R()*(b-a+1)), pick:a=>a[Math.floor(R()*a.length)], ch:p=>R()<p};
+  M.in=(r,c)=>r>=0&&c>=0&&r<rows&&c<cols;
+  M.walk=(r,c)=>M.in(r,c)&&!BLOCKING_ZONES.has(M.Z[r][c])&&!M.solid.has(r*cols+c);
+  M.free=(r,c)=>M.walk(r,c)&&!M.occ.has(r*cols+c);
+  M.fill=(r1,c1,r2,c2,f,z)=>{ for(let r=Math.max(0,r1);r<=Math.min(rows-1,r2);r++)
+    for(let c=Math.max(0,c1);c<=Math.min(cols-1,c2);c++){ if(f!==undefined) M.F[r][c]=f; if(z!==undefined) M.Z[r][c]=z; } };
+  M.prop=(kind,r,c,extra={})=>{
+    const [w,h]=extra.w||extra.h?[extra.w||1,extra.h||1]:(PROP_SIZES[kind]||[1,1]);
+    for(let rr=r;rr<r+h;rr++)for(let cc=c;cc<c+w;cc++) if(!M.free(rr,cc)) return false;
+    const solid=extra.blocks!==undefined?extra.blocks:SOLID_PROPS.has(kind);
+    const flat=FLAT_PROPS.has(kind)||['rug','web','trapdoor','grate','plate','bones','runes','reeds','mushrooms'].includes(kind);
+    for(let rr=r;rr<r+h;rr++)for(let cc=c;cc<c+w;cc++){ if(!flat) M.occ.add(rr*cols+cc); if(solid) M.solid.add(rr*cols+cc); }
+    M.props.push({kind, at:refOf(r,c), ...(w>1?{w}:{}), ...(h>1?{h}:{}), ...extra}); return true;
+  };
+  M.scatter=(kind,n,ok,tries=60)=>{ let k=0;
+    for(let i=0;i<tries&&k<n;i++){ const r=M.ri(0,rows-1), c=M.ri(0,cols-1);
+      if((!ok||ok(r,c))&&M.prop(kind,r,c)) k++; } return k; };
+  M.tok=(t,r,c)=>{ M.occ.add(r*cols+c); M.tokens.push({...t, at:refOf(r,c), kind:t.kind||'foe'}); };
+  M.cellsIn=(r1,c1,r2,c2,pred)=>{ const out=[];
+    for(let r=Math.max(0,r1);r<=Math.min(rows-1,r2);r++)for(let c=Math.max(0,c1);c<=Math.min(cols-1,c2);c++)
+      if(M.free(r,c)&&(!pred||pred(r,c))) out.push([r,c]);
+    for(let i=out.length-1;i>0;i--){ const j=Math.floor(R()*(i+1)); [out[i],out[j]]=[out[j],out[i]]; }
+    return out; };
+  /* free squares spreading out from the middle of a box, so a group stands together */
+  M.cluster=(r1,c1,r2,c2,loose=.3)=>{
+    const cs=M.cellsIn(r1,c1,r2,c2); if(!cs.length) return [];
+    const mr=(r1+r2)/2, mc=(c1+c2)/2;
+    cs.sort((a,b)=>Math.hypot(a[0]-mr,a[1]-mc)-Math.hypot(b[0]-mr,b[1]-mc));
+    const out=[], seen=new Set([cs[0][0]*cols+cs[0][1]]), q=[cs[0]];
+    for(let i=0;i<q.length;i++){ const [r,c]=q[i];
+      if(i===0||R()>loose) out.push([r,c]);
+      for(const [rr,cc] of [[r-1,c],[r+1,c],[r,c-1],[r,c+1],[r-1,c-1],[r+1,c+1],[r-1,c+1],[r+1,c-1]]){
+        const k=rr*cols+cc; if(seen.has(k)||!M.free(rr,cc)) continue; seen.add(k); q.push([rr,cc]); } }
+    return out; };
+  M.party=(r1,c1,r2,c2)=>{ const cs=M.cluster(r1,c1,r2,c2,.15);
+    PARTY.forEach((p,i)=>{ if(cs[i]) M.tok({...p, kind:i<2?'pc':'ally'},cs[i][0],cs[i][1]); }); };
+  M.foes=(list,r1,c1,r2,c2)=>{ const cs=M.cluster(r1,c1,r2,c2); let i=0;
+    const count={}; list.forEach(f=>count[f.name]=(count[f.name]||0)+1);
+    const seen={};
+    for(const f of list){ const cell=cs[i++]; if(!cell) break;
+      seen[f.name]=(seen[f.name]||0)+1;
+      const many=count[f.name]>1, n=seen[f.name];
+      M.tok({...f, id:(f.art||f.icon||'f').slice(0,3)+n+'_'+i, name:many?f.name+' '+n:f.name,
+        label:many?String(n):f.name[0], kind:f.kind||'foe'}, cell[0], cell[1]); } };
+  return M;
+}
+function qmRects(grid,rows,cols){
+  const out=[], used=grid.map(row=>row.map(v=>v===null));
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    if(used[r][c]) continue;
+    const v=grid[r][c]; let c2=c;
+    while(c2+1<cols&&!used[r][c2+1]&&grid[r][c2+1]===v) c2++;
+    let r2=r;
+    for(;;){ const nr=r2+1; if(nr>=rows) break; let ok=true;
+      for(let k=c;k<=c2;k++) if(used[nr][k]||grid[nr][k]!==v){ ok=false; break; }
+      if(!ok) break; r2=nr; }
+    for(let rr=r;rr<=r2;rr++)for(let k=c;k<=c2;k++) used[rr][k]=true;
+    out.push({from:refOf(r,c), to:refOf(r2,c2), type:v});
+  }
+  return out;
+}
+/* can every token reach the first one? (breadth-first over walkable squares) */
+function qmConnected(M){
+  if(M.tokens.length<2) return true;
+  const start=parseRef(M.tokens[0].at), seen=new Set([start.r*M.cols+start.c]), q=[start];
+  for(let i=0;i<q.length;i++){ const {r,c}=q[i];
+    for(const [rr,cc] of [[r-1,c],[r+1,c],[r,c-1],[r,c+1]]){
+      const k=rr*M.cols+cc; if(seen.has(k)||!M.walk(rr,cc)) continue; seen.add(k); q.push({r:rr,c:cc}); } }
+  return M.tokens.every(t=>{ const p=parseRef(t.at); return seen.has(p.r*M.cols+p.c); });
+}
+function qmFinish(M,meta){
+  for(let r=0;r<M.rows;r++)for(let c=0;c<M.cols;c++) if(M.F[r][c]===M.ground) M.F[r][c]=null;
+  const tokens=M.tokens.map(({darkvision,...t})=>({...t, ...(darkvision?{vision:{dark:darkvision}}:{})}));
+  return {header:meta.header, sub:meta.sub, ground:M.ground, rows:M.rows, cols:M.cols,
+    zones:[...qmRects(M.F,M.rows,M.cols), ...qmRects(M.Z,M.rows,M.cols)],
+    props:M.props, lights:M.lights, tokens,
+    fow:{on:!!meta.fow, ambient:meta.ambient||'bright'},
+    ...(meta.weather?{weather:meta.weather}:{}),
+    initiative:[],
+    legend:meta.legend||[]};
+}
+/* retry a generator until the map it makes is connected */
+function qmMake(gen){ return seed=>{
+  for(let k=0;k<12;k++){ const out=gen(seed+k*7919); if(out) return out; }
+  return gen(seed,true);
+}; }
+
+const QUICK_MAPS=[
+{id:'graveyard', name:'Graveyard', icon:'✝', blurb:'A walled boneyard at night: rows of headstones, a mausoleum, fog in the low ground.',
+ make:qmMake((seed,force)=>{
+  const M=qmBase(16,18,'grass',seed);
+  for(let r=0;r<16;r++)for(let c=0;c<18;c++) if(macro(r*1.3+seed%97,c*1.3)>.62) M.F[r][c]='dirt';
+  M.fill(1,1,14,16,'boneyard');
+  const pc=M.ri(6,10);                                     // the path in from the south gate
+  for(let r=1;r<16;r++){ M.F[r][pc]='cobble'; M.F[r][pc+1]='cobble'; }
+  for(let c=1;c<17;c++){ M.F[7][c]='cobble'; }
+  for(let c=0;c<18;c++){ if(c!==pc&&c!==pc+1){ M.prop('lowwall',0,c); M.prop('lowwall',15,c); } }
+  for(let r=1;r<15;r++){ if(r!==7){ M.prop('lowwall',r,0); M.prop('lowwall',r,17); } }
+  const mr=M.ch(.5)?1:9, mc=pc>8?2:13;
+  M.fill(mr,mc-1,mr+4,mc+3,'crypt');
+  M.prop('mausoleum',mr+1,mc); M.prop('banner',mr+1,mc-1); M.prop('lantern',mr+3,mc+2);
+  for(let r=2;r<14;r+=2)for(let c=2;c<16;c+=2){
+    if(Math.abs(c-pc)<2||r===7||r===8) continue;
+    if(M.ch(.55)) M.prop('headstone',r,c+(M.ch(.3)?1:0)); else if(M.ch(.35)) M.prop('grave',r,c); }
+  M.scatter('deadtree',2,(r,c)=>r>1&&r<13&&c>1&&c<15);
+  M.scatter('gibbet',1,(r,c)=>r<6); M.scatter('skulls',2); M.scatter('bones',3); M.scatter('candles',2,(r,c)=>r>1&&r<14);
+  M.prop('lamppost',14,pc-1); M.prop('lamppost',14,pc+2);
+  const fr=M.ri(2,11), fc=M.ri(2,12); M.fill(fr,fc,fr+2,fc+3,undefined,'fog');
+  M.party(13,pc-1,14,pc+2);
+  M.foes([{name:'Skeleton',art:'skeleton',hp:13,ac:14,init:6},{name:'Skeleton',art:'skeleton',hp:13,ac:14,init:6},
+    {name:'Ghoul',art:'ghoul',hp:22,ac:13,init:8},{name:'Gravehound',art:'gravehound',hp:18,ac:13,init:9},
+    ...(M.ch(.5)?[{name:'Wraith',art:'wraith',hp:28,ac:15,init:10,frame:'arcane'}]:[])], 1,1,8,16);
+  if(!force&&!qmConnected(M)) return null;
+  return qmFinish(M,{header:'The Gravelands Boneyard', sub:'night · mist off the barrows · 1 square = 5 ft',
+    ambient:'dim', weather:{type:'mist', intensity:.55},
+    legend:[['low wall: cover','var(--dim)'],['fog: obscured','#9aa3ab']]});
+ })},
+{id:'crypt', name:'Crypt', icon:'⚰', blurb:'Rooms and corridors cut into the rock under a chapel. Fog of war on, torches only.',
+ make:qmMake((seed,force)=>{
+  const M=qmBase(16,18,'crypt',seed);
+  M.fill(0,0,15,17,undefined,'rock');
+  const rooms=[];
+  (function split(r1,c1,r2,c2,d){                          // BSP: halve the space, put a room in each leaf
+    const h=r2-r1+1, w=c2-c1+1;
+    if(d>=3||(h<9&&w<9)){
+      const rh=M.ri(Math.min(3,h-2),Math.max(3,h-2)), rw=M.ri(Math.min(3,w-2),Math.max(3,w-2));
+      const rr=M.ri(r1+1,Math.max(r1+1,r2-rh)), rc=M.ri(c1+1,Math.max(c1+1,c2-rw));
+      rooms.push({r1:rr,c1:rc,r2:Math.min(r2-1,rr+rh-1),c2:Math.min(c2-1,rc+rw-1)}); return; }
+    if(w>h){ const m=M.ri(c1+4,c2-4); split(r1,c1,r2,m,d+1); split(r1,m+1,r2,c2,d+1); }
+    else { const m=M.ri(r1+4,r2-4); split(r1,c1,m,c2,d+1); split(m+1,c1,r2,c2,d+1); }
+  })(0,0,15,17,0);
+  for(const q of rooms) M.fill(q.r1,q.c1,q.r2,q.c2,undefined,null);
+  const ctr=q=>[Math.round((q.r1+q.r2)/2),Math.round((q.c1+q.c2)/2)];
+  const doors=[];
+  for(let i=1;i<rooms.length;i++){                         // L-shaped corridor from each room to the last
+    const [ar,ac]=ctr(rooms[i-1]), [br,bc]=ctr(rooms[i]);
+    const path=[]; const hFirst=M.ch(.5);
+    if(hFirst){ for(let c=Math.min(ac,bc);c<=Math.max(ac,bc);c++) path.push([ar,c]);
+      for(let r=Math.min(ar,br);r<=Math.max(ar,br);r++) path.push([r,bc]); }
+    else { for(let r=Math.min(ar,br);r<=Math.max(ar,br);r++) path.push([r,ac]);
+      for(let c=Math.min(ac,bc);c<=Math.max(ac,bc);c++) path.push([br,c]); }
+    for(const [r,c] of path){
+      if(M.Z[r][c]==='rock'){
+        const inRoom=(rr,cc)=>rooms.some(q=>rr>=q.r1&&rr<=q.r2&&cc>=q.c1&&cc<=q.c2);
+        const nextToRoom=[[r-1,c],[r+1,c],[r,c-1],[r,c+1]].some(([rr,cc])=>inRoom(rr,cc));
+        if(nextToRoom&&M.ch(.6)) doors.push([r,c]);
+        M.Z[r][c]=null; M.F[r][c]='stone'; } } }
+  /* doors only where a wall runs either side of the gap */
+  for(const [r,c] of doors){
+    const ns=M.Z[r-1]?.[c]==='rock'&&M.Z[r+1]?.[c]==='rock', ew=M.Z[r][c-1]==='rock'&&M.Z[r][c+1]==='rock';
+    if(ns||ew) M.prop('door',r,c); }
+  rooms.sort((a,b)=>(b.r2-b.r1+1)*(b.c2-b.c1+1)-(a.r2-a.r1+1)*(a.c2-a.c1+1));
+  const big=rooms[0], start=rooms[rooms.length-1];
+  M.fill(big.r1,big.c1,big.r2,big.c2,'marble');
+  const [br,bc]=ctr(big);
+  M.prop('sarcophagus',br,Math.max(big.c1,bc-1)); M.prop('candles',big.r1,big.c1); M.prop('candles',big.r1,big.c2);
+  if(big.c2-big.c1>=4){ M.prop('pillar',big.r1,big.c1+1); M.prop('pillar',big.r2,big.c2-1); }
+  M.fill(br-1,bc-2,br+1,bc+2,undefined,'blight');
+  for(const q of rooms.slice(1)){
+    const kind=M.pick(['coffin','bones','web','chest','statue','skulls','brazier','rubble','candles']);
+    M.prop(kind,M.ri(q.r1,q.r2),M.ri(q.c1,q.c2));
+    if(M.ch(.6)) M.prop(M.pick(['coffin','bones','torch','web','barrel']),M.ri(q.r1,q.r2),M.ri(q.c1,q.c2)); }
+  M.prop('torch',start.r1,start.c1);
+  M.party(start.r1,start.c1,start.r2,start.c2);
+  const midRooms=rooms.slice(1,-1);
+  const hordes=[{name:'Skeleton',art:'skeleton',hp:13,ac:14,init:6},{name:'Zombie',art:'zombie',hp:22,ac:8,init:2}];
+  midRooms.forEach(q=>{ if(M.ch(.6)) M.foes([M.pick(hordes),M.pick(hordes)],q.r1,q.c1,q.r2,q.c2); });
+  M.foes([{name:'Death Knight',art:'deathknight',hp:65,ac:20,init:8,frame:'blood'},
+    {name:'Skeleton',art:'skeleton',hp:13,ac:14,init:6}],big.r1,big.c1,big.r2,big.c2);
+  if(!force&&(rooms.length<4||!qmConnected(M))) return null;
+  return qmFinish(M,{header:'The Sunken Crypt', sub:'beneath the chapel · torchlight only', fow:true, ambient:'dark',
+    legend:[['blight: sickening','#8aa05a'],['doors open with a tap of the GM','var(--dim)']]});
+ })},
+{id:'chapel', name:'Ruined chapel', icon:'⛪', blurb:'A broken nave with a cult at the altar. Pillars for cover, a consecrated circle, ash on the wind.',
+ make:qmMake((seed,force)=>{
+  const M=qmBase(16,16,'ash',seed);
+  M.fill(1,3,14,12,'ruin'); M.fill(2,4,13,11,'marble');
+  for(let r=1;r<=14;r++){ M.Z[r][3]='pit'; M.Z[r][12]='pit'; }
+  for(let c=3;c<=12;c++){ M.Z[1][c]='pit'; M.Z[14][c]='pit'; }
+  M.Z[14][7]=null; M.Z[14][8]=null;                       // the west door, long gone
+  for(let k=0;k<4;k++){                                    // breaches in the walls, rubble spilling out
+    const side=M.pick([3,12]), r=M.ri(3,12); M.Z[r][side]='rough'; M.F[r][side]='ruin';
+    if(M.in(r,side+(side===3?-1:1))) M.Z[r][side+(side===3?-1:1)]='rough'; }
+  for(let r=4;r<=12;r+=3){ M.prop('pillar',r,5); M.prop('pillar',r,10); }
+  M.fill(2,6,3,9,undefined,'holy');
+  M.prop('altar',2,7); M.prop('sigil',3,6,{w:4,h:2,color:'blood'}); M.prop('candles',2,6); M.prop('candles',2,9);
+  M.prop('banner',2,4); M.prop('banner',2,11); M.prop('brazier',5,7); M.prop('brazier',5,8);
+  for(let r=7;r<=12;r+=2){ if(M.ch(.75)) M.prop('table',r,6,{w:2}); if(M.ch(.75)) M.prop('table',r,8,{w:2}); }
+  M.scatter('rubble',3,(r,c)=>M.F[r][c]==='marble'); M.scatter('bones',2);
+  const br=M.ri(6,10), bc=M.ri(5,9); M.fill(br,bc,br+1,bc+1,undefined,'blood');
+  M.scatter('deadtree',2,(r,c)=>c<2||c>13); M.scatter('headstone',4,(r,c)=>c<2||c>13); M.scatter('scorch',3);
+  M.party(15,6,15,9);
+  M.foes([{name:'Cult Priest',art:'priest',hp:38,ac:15,init:7,frame:'blood'},
+    {name:'Cultist',art:'cultist',hp:16,ac:13,init:5},{name:'Cultist',art:'cultist',hp:16,ac:13,init:5},
+    {name:'Cultist',art:'cultist',hp:16,ac:13,init:5},...(M.ch(.6)?[{name:'Ghoul',art:'ghoul',hp:22,ac:13,init:8}]:[])],2,4,6,11);
+  if(!force&&!qmConnected(M)) return null;
+  return qmFinish(M,{header:'The Ashen Chapel', sub:'the rite is underway · 1 square = 5 ft', ambient:'dim',
+    weather:{type:'ash', intensity:.5},
+    legend:[['pillar: standard cover','var(--dim)'],['consecrated ground','#e8d9a0'],['rubble: difficult','var(--dim)']]});
+ })},
+{id:'cave', name:'Spider cave', icon:'🕷', blurb:'A cave grown by cellular automata: a black pool, glowing crystals, webs and what spun them.',
+ make:qmMake((seed,force)=>{
+  const M=qmBase(16,18,'cave',seed);
+  let G=[...Array(16)].map((_,r)=>Array.from({length:18},(_,c)=>r===0||c===0||r===15||c===17||M.R()<.43));
+  for(let it=0;it<5;it++) G=G.map((row,r)=>row.map((v,c)=>{
+    let n=0; for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){ if(!dr&&!dc) continue;
+      const rr=r+dr, cc=c+dc; n+=(rr<0||cc<0||rr>15||cc>17||G[rr][cc])?1:0; }
+    return n>4||(n===4&&v); }));
+  /* keep only the biggest open pocket */
+  const comp=[...Array(16)].map(()=>Array(18).fill(-1)); let best=-1, bestN=0, id=0;
+  for(let r=0;r<16;r++)for(let c=0;c<18;c++){ if(G[r][c]||comp[r][c]>=0) continue;
+    const q=[[r,c]]; comp[r][c]=id; for(let i=0;i<q.length;i++){ const [a,b]=q[i];
+      for(const [aa,bb] of [[a-1,b],[a+1,b],[a,b-1],[a,b+1]])
+        if(aa>=0&&bb>=0&&aa<16&&bb<18&&!G[aa][bb]&&comp[aa][bb]<0){ comp[aa][bb]=id; q.push([aa,bb]); } }
+    if(q.length>bestN){ bestN=q.length; best=id; } id++; }
+  if(!force&&bestN<90) return null;
+  for(let r=0;r<16;r++)for(let c=0;c<18;c++) if(G[r][c]||comp[r][c]!==best) M.Z[r][c]='rock';
+  const open=M.cellsIn(0,0,15,17);
+  const [pr,pc]=open[0]||[8,8];
+  for(let r=pr-1;r<=pr+2;r++)for(let c=pc-2;c<=pc+2;c++)
+    if(M.in(r,c)&&M.Z[r][c]===null&&Math.hypot(r-pr-.5,c-pc)<2.4) M.Z[r][c]='water';
+  for(let r=0;r<16;r++)for(let c=0;c<18;c++)
+    if(M.Z[r][c]===null&&macro(r*1.7+seed%31,c*1.7)>.66) M.F[r][c]='mud';
+  M.scatter('stalagmite',5,(r,c)=>[[r-1,c],[r+1,c],[r,c-1],[r,c+1]].some(([a,b])=>M.in(a,b)&&M.Z[a][b]==='rock'));
+  M.scatter('crystal',3); M.scatter('mushrooms',4); M.scatter('web',5); M.scatter('bones',3); M.scatter('skulls',1);
+  /* party at one end, the nest at the other */
+  open.sort((a,b)=>a[1]-b[1]);
+  const left=open.slice(0,14), right=open.slice(-18);
+  const box=a=>[Math.min(...a.map(x=>x[0])),Math.min(...a.map(x=>x[1])),Math.max(...a.map(x=>x[0])),Math.max(...a.map(x=>x[1]))];
+  M.party(...box(left));
+  M.foes([{name:'Giant Spider',art:'spider',hp:32,ac:14,init:9},{name:'Giant Spider',art:'spider',hp:32,ac:14,init:9},
+    {name:'Ooze',art:'ooze',hp:40,ac:8,init:1},{name:'Cave Rat',art:'rat',hp:6,ac:12,init:6},{name:'Cave Rat',art:'rat',hp:6,ac:12,init:6},
+    {name:'Bat swarm',art:'bat',hp:12,ac:12,init:10}],...box(right));
+  if(!force&&!qmConnected(M)) return null;
+  return qmFinish(M,{header:'The Weeping Cave', sub:'spores hang in the air · darkvision helps', fow:true, ambient:'dark',
+    weather:{type:'spores', intensity:.6},
+    legend:[['web: restrained on a failed save','var(--dim)'],['pool: deep water','#6fa9ad']]});
+ })},
+{id:'road', name:'Forest road', icon:'🌲', blurb:'An ambush on a muddy road through pines, a stream to ford, a wagon on its side. Rain.',
+ make:qmMake((seed,force)=>{
+  const M=qmBase(16,18,'grass',seed);
+  let rc=M.ri(5,11); const roadAt=[];
+  for(let r=0;r<16;r++){ rc=clamp(rc+(M.ch(.35)?M.pick([-1,1]):0),3,13); roadAt[r]=rc;
+    M.F[r][rc]='dirt'; M.F[r][rc+1]='dirt'; if(M.ch(.3)) M.F[r][rc+(M.ch(.5)?-1:2)]='mud'; }
+  let sr=M.ri(5,10);
+  for(let c=0;c<18;c++){ sr=clamp(sr+(M.ch(.3)?M.pick([-1,1]):0),3,12);
+    M.Z[sr][c]='water'; if(M.ch(.5)) M.Z[sr+1][c]='water';
+    if(M.F[sr][c]==='dirt'){ M.Z[sr][c]='swamp'; if(M.Z[sr+1][c]==='water') M.Z[sr+1][c]='swamp'; } }
+  M.scatter('reeds',5,(r,c)=>[[r-1,c],[r+1,c]].some(([a,b])=>M.in(a,b)&&M.Z[a][b]==='water'));
+  const nearRoad=(r,c)=>M.in(r,c)&&M.F[r][c]!=='dirt'&&M.F[r][c]!=='mud'&&M.Z[r][c]===null;
+  M.scatter('tree',5,(r,c)=>nearRoad(r,c)&&nearRoad(r+1,c+1)); M.scatter('pine',12,nearRoad);
+  M.scatter('bush',7,nearRoad); M.scatter('rock',3,nearRoad); M.scatter('stump',2,nearRoad); M.scatter('log',2,nearRoad);
+  const wr=M.ch(.5)?M.ri(1,3):M.ri(12,13);
+  let wc=0; for(let c=0;c<17;c++) if(M.F[wr][c]==='dirt'){ wc=c; break; }
+  M.prop('wagon',wr,wc); M.prop('crate',wr+1,wc+2); M.prop('barrel',wr+1,wc-1); M.prop('sacks',wr-1,wc+1);
+  M.scatter('signpost',1,(r,c)=>M.F[r][c]===null&&Math.abs(r-wr)>3);
+  const pr=wr<8?13:1;
+  M.party(pr-1,roadAt[pr]-2,pr+1,roadAt[pr]+3);
+  const foeRows=wr<8?[1,5]:[10,14];
+  M.foes([{name:'Orc Raider',art:'orc',hp:23,ac:15,init:6},{name:'Orc Raider',art:'orc',hp:23,ac:15,init:6},
+    {name:'Orc Raider',art:'orc',hp:23,ac:15,init:6},{name:'Bandit Archer',art:'ranger',hp:16,ac:14,init:9}],foeRows[0],0,foeRows[1],17);
+  if(!force&&!qmConnected(M)) return null;
+  return qmFinish(M,{header:'The Vendry Road', sub:'an ambush in the rain · 1 square = 5 ft', ambient:'dim',
+    weather:{type:'rain', intensity:.65},
+    legend:[['trees: cover, block sight','var(--dim)'],['stream: difficult','#6fa9ad'],['ford: swamp, difficult','#7d8a5a']]});
+ })},
+{id:'village', name:'Burning village', icon:'🔥', blurb:'Vendry square after the dead came: timber houses, a well, a market, embers on the wind.',
+ make:qmMake((seed,force)=>{
+  const M=qmBase(16,18,'mud',seed);
+  M.fill(5,5,10,12,'cobble');
+  const houses=[[0,0,4,5],[0,7,3,11],[0,13,4,17],[11,0,15,4],[12,6,15,11],[11,13,15,17]];
+  for(const [r1,c1,r2,c2] of houses){
+    if(M.ch(.12)) continue;
+    const a=r1+M.ri(0,1), b=c1+M.ri(0,1), c=r2-M.ri(0,1), d=c2-M.ri(0,1);
+    M.fill(a,b,c,d,M.ch(.5)?'ruin':'wood');
+    const doorSide=a<8?c:a, doorC=M.ri(b+1,d-1);
+    for(let r=a;r<=c;r++)for(let cc=b;cc<=d;cc++){
+      const edge=r===a||r===c||cc===b||cc===d;
+      if(edge&&!(r===doorSide&&cc===doorC)) M.prop('woodwall',r,cc); }
+    M.prop(M.pick(['bed','table','hearth','barrel']),M.ri(a+1,c-1),M.ri(b+1,d-1));
+    if(M.ch(.55)){ const fr=M.ri(a+1,c-1), fc=M.ri(b+1,d-1); M.prop('scorch',fr,fc); M.prop('campfire',fr,fc); } }
+  M.prop('pyre',8,10);
+  M.prop('well',7,8); M.prop('stall',5,5); M.prop('stall',10,11); M.prop('lamppost',5,12); M.prop('lamppost',10,5);
+  M.prop('haystack',6,14); M.prop('wagon',9,14); M.scatter('barrel',3,(r,c)=>r>4&&r<11); M.scatter('crate',3,(r,c)=>r>4&&r<11);
+  M.scatter('scorch',4); M.scatter('bones',2,(r,c)=>r>4&&r<11);
+  M.party(6,0,9,2);
+  M.foes([{name:'Zombie',art:'zombie',hp:22,ac:8,init:2},{name:'Zombie',art:'zombie',hp:22,ac:8,init:2},
+    {name:'Zombie',art:'zombie',hp:22,ac:8,init:2},{name:'Ghoul',art:'ghoul',hp:22,ac:13,init:8},
+    {name:'Vampire Spawn',art:'vampire',hp:45,ac:15,init:11,frame:'blood'}],5,9,10,17);
+  if(!force&&!qmConnected(M)) return null;
+  return qmFinish(M,{header:'Vendry Square', sub:'the night the dead came · 1 square = 5 ft', ambient:'dim',
+    weather:{type:'embers', intensity:.6},
+    legend:[['timber walls: block sight','var(--dim)'],['mud: difficult','#7a6248']]});
+ })},
+{id:'frozen', name:'Frozen lake', icon:'❄', blurb:'Thin ice over black water, pines on the shore, snow coming down. Slippery footing everywhere.',
+ make:qmMake((seed,force)=>{
+  const M=qmBase(16,18,'snow',seed);
+  const cr=M.ri(6,9), cc=M.ri(7,10), rr=M.ri(5,6), rcx=M.ri(6,8);
+  for(let r=0;r<16;r++)for(let c=0;c<18;c++){
+    const d=Math.hypot((r-cr)/rr,(c-cc)/rcx)+(macro(r+seed%13,c)-.5)*.5;
+    if(d<.45) M.Z[r][c]='water'; else if(d<1) M.Z[r][c]='ice'; }
+  M.scatter('pine',14,(r,c)=>M.Z[r][c]===null); M.scatter('rock',5,(r,c)=>M.Z[r][c]===null);
+  M.scatter('tree',2,(r,c)=>M.Z[r][c]===null&&M.Z[r+1]?.[c+1]===null);
+  M.scatter('campfire',1,(r,c)=>M.Z[r][c]===null); M.scatter('tent',1,(r,c)=>[0,1].every(dr=>[0,1].every(dc=>M.in(r+dr,c+dc)&&M.Z[r+dr][c+dc]===null)));
+  M.scatter('boat',1,(r,c)=>M.Z[r][c]==='ice');
+  const shore=M.cellsIn(0,0,15,17,(r,c)=>M.Z[r][c]===null);
+  shore.sort((a,b)=>a[1]-b[1]);
+  const box=a=>[Math.min(...a.map(x=>x[0])),Math.min(...a.map(x=>x[1])),Math.max(...a.map(x=>x[0])),Math.max(...a.map(x=>x[1]))];
+  M.party(...box(shore.slice(0,10)));
+  M.foes([{name:'Wraith',art:'wraith',hp:28,ac:15,init:10,frame:'silver'},{name:'Skeleton',art:'skeleton',hp:13,ac:14,init:6},
+    {name:'Skeleton',art:'skeleton',hp:13,ac:14,init:6},{name:'Gravehound',art:'gravehound',hp:18,ac:13,init:9}],
+    ...box(shore.slice(-14)));
+  if(!force&&!qmConnected(M)) return null;
+  return qmFinish(M,{header:'Hollowmere', sub:'the lake froze the night they drowned · 1 square = 5 ft', ambient:'dim',
+    weather:{type:'snow', intensity:.6},
+    legend:[['ice: slippery, Acrobatics or fall prone','#cfe4ee'],['open water: swim','#6fa9ad']]});
+ })},
+];
 
 /* =============================== boot =============================== */
 window.VTT={ apply:applyBatch, state:()=>S, stateForGM,
