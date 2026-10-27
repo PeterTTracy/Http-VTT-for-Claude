@@ -281,6 +281,45 @@
   #fx{position:absolute; left:0; top:0; pointer-events:none; z-index:7}
   #viewport.painting{cursor:crosshair}
   #viewport.painting .token{pointer-events:none}
+  /* Claude panel */
+  .cl-grid{display:grid; grid-template-columns:58px 1fr; gap:6px 8px; align-items:center; margin:5px 0}
+  .cl-grid .row2{margin:0}
+  .cl-grid select.inp{width:100%}
+  .cl-note{font-size:11px; line-height:1.5; margin:4px 0 8px}
+  .cl-key .ok{color:var(--kelp)}
+  .cl-key .dim{font-size:10.5px}
+  .cl-modes{margin-top:10px; border-top:1px solid var(--grid); padding-top:10px}
+  .cl-chips .btn.ask{font-size:10.5px; padding:3px 8px; text-align:left; white-space:normal}
+  .cl-brief{margin:4px 0 8px; font-size:11px}
+  .cl-brief summary{cursor:pointer; margin-bottom:4px}
+  .cl-notes{border-left:2px solid var(--rope); padding:4px 8px; margin:6px 0; font-size:11px; line-height:1.5}
+  .cl-notes b{color:var(--lamp); font-weight:normal; letter-spacing:.06em}
+  .cl-log{display:flex; flex-direction:column; gap:6px; margin:8px 0; max-height:46vh; min-height:80px;
+    overflow-y:auto; padding-right:2px}
+  .cl-empty{font-size:11px; padding:14px 4px; text-align:center}
+  .cl-msg{font-size:12px; line-height:1.55; padding:7px 9px; border-radius:4px; border:1px solid var(--grid);
+    background:#12171a; overflow-wrap:anywhere}
+  .cl-msg p{margin:0 0 6px} .cl-msg p:last-child{margin:0}
+  .cl-msg ul{margin:2px 0 6px; padding-left:18px}
+  .cl-msg code{background:#0b0e10; padding:0 3px; border-radius:2px}
+  .cl-msg.you{align-self:flex-end; max-width:88%; border-color:#4a3d2a; background:#1d1913; color:var(--lamp)}
+  .cl-msg.narr{font-family:Georgia,'Iowan Old Style',serif; font-size:13.5px; line-height:1.6;
+    border-color:#3c3428; background:linear-gradient(#17140f,#13110d); color:#e3d8c0}
+  .cl-msg.err{border-color:var(--hurt); color:#e0a49b}
+  .cl-tool{font-size:10.5px; color:var(--dim); padding:1px 9px; border-left:2px solid var(--kelp)}
+  .cl-tool.err{border-left-color:var(--hurt); color:#c48a80}
+  .cl-sug{font-size:11.5px; border:1px dashed var(--lamp); border-radius:4px; padding:7px 9px; background:#1a1610}
+  .cl-sug .row2{margin:6px 0 0}
+  .cl-dir{font-size:10.5px; border:1px solid var(--grid); border-radius:4px; padding:6px 9px; background:#101417}
+  .cl-dir .h3{margin:0 0 4px; color:var(--steel)}
+  .cl-dir .bar{display:grid; grid-template-columns:112px 1fr 22px; align-items:center; gap:6px; margin:2px 0}
+  .cl-dir .bar i{display:block; height:5px; border-radius:3px; background:linear-gradient(90deg,var(--kelp) var(--v),#262c30 var(--v))}
+  .cl-dir .bar b{font-weight:normal; text-align:right; color:var(--text)}
+  .cl-input{display:flex; gap:6px; align-items:stretch}
+  .cl-input .col{display:flex; flex-direction:column; gap:4px}
+  .cl-live::after{content:'▍'; animation:blink 1s steps(2) infinite; color:var(--lamp)}
+  @keyframes blink{50%{opacity:0}}
+  @media (prefers-reduced-motion:reduce){ .cl-live::after{animation:none} }
   #inspector{display:none; width:min(96vw,860px); margin-top:8px; background:var(--panel);
     border:1px solid var(--grid); border-radius:4px; padding:8px 12px;
     font-family:ui-monospace,monospace; font-size:11.5px}
@@ -4955,6 +4994,701 @@ const QUICK_MAPS=[
     legend:[['ice: slippery, Acrobatics or fall prone','#cfe4ee'],['open water: swim','#6fa9ad']]});
  })},
 ];
+
+/* ======================= Claude at the table =======================
+   Three jobs, one engine:
+     · Rules  — a rules assistant for the GM. It reads the board, rolls on
+                the tray and proposes board changes the GM applies with a tap.
+     · Narrator — Claude takes the GM's chair. The board is the source of
+                truth: every attack, save and move goes through the same
+                validated commands a human GM uses, and Claude narrates what
+                the dice decided. A Director (a second, stronger model)
+                grades the session on a seven-part rubric every few turns and
+                steers the Narrator.
+     · Map maker — describe a fight, get a battle map built from the asset
+                library, checked square by square and rebuilt until it's
+                sound.
+   Two engines run it: the GM's own API key (sent from this browser straight
+   to api.anthropic.com and nowhere else), or, when this page is opened as a
+   Claude artifact, the viewer's own Claude through the page's `sample`
+   capability. The key is kept only in this browser's storage and never in
+   the saved session, the settings or the log. */
+
+const KEY_SLOT='vtt-anthropic-key';
+let memKey=null;                                       // used only when storage is unavailable
+function getKey(){
+  try{ const s=sessionStorage.getItem(KEY_SLOT); if(s) return s; }catch(e){}
+  try{ const l=localStorage.getItem(KEY_SLOT); if(l) return l; }catch(e){}
+  return memKey;
+}
+function keyWhere(){
+  try{ if(sessionStorage.getItem(KEY_SLOT)) return 'tab'; }catch(e){}
+  try{ if(localStorage.getItem(KEY_SLOT)) return 'device'; }catch(e){}
+  return memKey?'page':null;
+}
+function setKey(k, remember){
+  forgetKey();
+  let ok=false;
+  try{ (remember?localStorage:sessionStorage).setItem(KEY_SLOT,k); ok=true; }catch(e){}
+  if(!ok) memKey=k;
+}
+function forgetKey(){
+  memKey=null;
+  try{ sessionStorage.removeItem(KEY_SLOT); }catch(e){}
+  try{ localStorage.removeItem(KEY_SLOT); }catch(e){}
+}
+
+const MODELS=[['claude-haiku-5-5','Haiku 5.5 · fast, cheapest'],['claude-sonnet-5-5','Sonnet 5.5 · balanced'],
+  ['claude-opus-5-5','Opus 5.5 · strongest'],['claude-fable-5-1','Fable 5.1 · most capable']];
+const PRICES={'claude-haiku-5-5':[0.10,0.50,0.01],'claude-sonnet-5-5':[2,10,0.20],
+  'claude-opus-5-5':[4,20,0.20],'claude-fable-5-1':[10,50,0.25]};   // $ per million: in, out, cache read
+const TIER_OF={'claude-haiku-5-5':'quick','claude-sonnet-5-5':'default','claude-opus-5-5':'complex','claude-fable-5-1':'complex'};
+SET.engine=SET.engine||null; SET.model=SET.model||'claude-haiku-5-5'; SET.dmodel=SET.dmodel||'claude-sonnet-5-5';
+SET.cmode=SET.cmode||'rules'; SET.every=SET.every||8;
+SET.brief=SET.brief??'The Gravelands: a dark-fantasy borderland of barrows and drowned villages, where the dead do not stay buried. The party works out of Vendry, a mud-and-timber town at the edge of the marsh. Grim, grounded, a little gallows humour. Danger is real; victories are earned.';
+const USAGE={in:0, out:0, cacheR:0, cacheW:0, usd:0, calls:0};
+let SAMPLE=null, SAMPLE_TOOLS=false;
+(async()=>{
+  try{
+    if(!window.claude||typeof window.claude.use!=='function') return;
+    const s=await window.claude.use('sample'); if(!s) return;
+    SAMPLE=s;
+    try{ const L=await s.limits(); SAMPLE_TOOLS=!!(L&&L.tools); }catch(e){ SAMPLE_TOOLS=false; }
+    if(!SET.engine&&!getKey()) SET.engine='page';
+    if(SIDE_TAB==='claude') renderClaude();
+  }catch(e){}
+})();
+function engine(){
+  const e=SET.engine||(getKey()?'key':SAMPLE?'page':'key');
+  return e==='page'&&!SAMPLE?'key':e;
+}
+
+/* ---------- the board, told to a model ---------- */
+const ASCII_OF={pit:'#',rock:'#',water:'~',swamp:'"',rough:';',ice:'_',lava:'^',chasm:'v',fog:'f',dark:'D',blight:'b',blood:',',holy:'+'};
+function asciiMap(){
+  const g=[...Array(ROWS)].map((_,r)=>Array.from({length:COLS},(_,c)=>ASCII_OF[typeGrid[r][c]]||'.'));
+  for(const p of S.props){
+    if(!p.kind||p.r>=ROWS||p.c>=COLS) continue;
+    const ch=p.kind==='door'||p.kind==='secretdoor'?'|':propSolid(p)?'O':'p';
+    for(let r=p.r;r<Math.min(ROWS,p.r+(p.h||1));r++)for(let c=p.c;c<Math.min(COLS,p.c+(p.w||1));c++)
+      if(g[r][c]==='.'||ch!=='p') g[r][c]=ch;
+  }
+  for(const t of S.tokens) if(!t.hidden&&t.r<ROWS&&t.c<COLS) g[t.r][t.c]=t.kind==='pc'||t.kind==='ally'?'@':'x';
+  return g.map((row,r)=>LETTERS[r]+' '+row.join('')).join('\n');
+}
+const ASCII_KEY='# wall/rock · ~ water · " swamp · ; rubble · _ ice · ^ lava · v chasm · f fog · D magical darkness · b blight · , blood · + consecrated · O solid prop (cover, blocks sight) · p other prop · | door · @ party · x foe';
+function boardBrief(){
+  const g=stateForGM();
+  g.tokens=g.tokens.map(t=>{ const tk=S.tokens.find(x=>x.id===t.id);
+    return {...t, kind:tk.kind, ...(tk.ac!==undefined?{ac:tk.ac}:{}), ...(tk.init!==undefined?{init:tk.init}:{}),
+      ...(tk.size>1?{size:tk.size}:{}), ...(tk.hidden?{hidden:true}:{})}; });
+  g.size=`${ROWS} rows (A to ${LETTERS[ROWS-1]}) × ${COLS} columns (1 to ${COLS}), 1 square = 5 ft`;
+  g.initiative=S.initiative.length?S.initiative.map((e,i)=>(i===S.active?'▶ ':'')+e.name):'not in combat';
+  return g;
+}
+function boardText(){
+  return 'BOARD STATE\n'+JSON.stringify(boardBrief())+'\n\nMAP (row letter, then one character per column from 1)\n'+asciiMap()+'\nKey: '+ASCII_KEY;
+}
+const RULES_NAME={pf2e:'Pathfinder 2e (Remaster)', '5e':'D&D 5e (2024 rules)'};
+const COMMAND_CARD=`Board commands are JSON objects; send them as an array. A square is a row letter and column number, like "E7". t is a token id or name.
+- {"do":"move","t":"G","to":"E7"}
+- {"do":"attack","t":"G","target":"sk1","bonus":7,"damage":"1d12+4","map":0,"label":"greataxe"}: rolls against the target's AC, applies damage on a hit, doubles it on a critical. map is the multiple attack penalty (PF2e: 0, 5, 10; agile 0, 4, 8).
+- {"do":"save","t":"W","mod":5,"dc":18,"damage":"4d6","cond":"prone"}: PF2e basic save (crit success none, success half, failure full, crit failure double); 5e success halves ("half":false for none). cond is added on a failure.
+- {"do":"check","t":"H","mod":6,"dc":15,"label":"Medicine"}
+- {"do":"damage","t":"sk1","n":7} · {"do":"heal","t":"G","n":5}
+- {"do":"cond","t":"G","add":["prone"],"remove":["frightened"]}: prone grabbed restrained frightened blinded stunned poisoned burning bleeding slowed offguard blessed
+- {"do":"combat"}: rolls initiative for everyone on the board from their init bonus and starts round 1 · {"do":"combat","end":true}
+- {"do":"next"}: ends the current turn · {"do":"turn","active":"Grit"}
+- {"do":"spawn","token":{"id":"gh2","name":"Ghoul 2","at":"C5","kind":"foe","art":"ghoul","hp":22,"ac":13,"init":8}} · {"do":"remove","t":"gh2"}
+- {"do":"hide","t":"x"} · {"do":"reveal","t":"x","at":"F9"}
+- {"do":"marker","marker":{"id":"fb","shape":"circle","at":"F6","ft":20,"color":"orange","label":"fireball"}}: shapes circle, cone (ft + dir N/NE/E/…), line (ft + dir + w), square · {"do":"unmark","id":"fb"}
+- {"do":"say","text":"…","tone":"danger"}: a banner across the board, for big moments only
+- {"do":"ping","at":"F9"} · {"do":"zone","from":"A1","to":"B3","type":"fog"} · {"do":"ambient","light":"dark"} · {"do":"weather","type":"storm","intensity":0.8}`;
+
+/* ---------- validation: the mechanical layer decides ---------- */
+const CMD_NAMES=new Set(['scene','title','move','damage','heal','hp','status','cond','spawn','remove','marker','unmark','zone',
+  'clearzones','light','clearlights','prop','unprop','ground','line','legend','init','turn','next','round','wall','walls',
+  'fow','fog_of_war','weather','ambient','vision','hide','reveal','ping','aura','roll','check','save','attack','strike','combat','say']);
+const REF_RE=/^[A-Za-z]\d{1,2}$/;
+function checkCmds(cmds){
+  const errs=[];
+  if(!Array.isArray(cmds)) return ['commands must be an array of command objects'];
+  if(cmds.length>40) errs.push('too many commands in one call (40 at most)');
+  const born=new Set();
+  cmds.forEach((c,i)=>{ if(c&&c.do==='spawn'&&c.token){ if(c.token.id) born.add(String(c.token.id).toLowerCase());
+    if(c.token.name) born.add(String(c.token.name).toLowerCase()); } });
+  const tok=(q,i,field)=>{ if(q===undefined) return;
+    if(born.has(String(q).toLowerCase())) return;
+    try{ findTok(q); }catch(e){ errs.push(`#${i+1} ${field}: ${e}`); } };
+  const sq=(v,i,field)=>{ if(v===undefined||typeof v!=='string') return;
+    if(!REF_RE.test(v)){ errs.push(`#${i+1} ${field}: "${v}" is not a square like E7`); return; }
+    const p=parseRef(v); if(p.r<0||p.c<0||p.r>=ROWS||p.c>=COLS) errs.push(`#${i+1} ${field}: ${v} is off the board (${ROWS} rows A–${LETTERS[ROWS-1]}, ${COLS} columns)`); };
+  cmds.forEach((c,i)=>{
+    if(!c||typeof c!=='object'||Array.isArray(c)){ errs.push(`#${i+1}: not a command object`); return; }
+    const d=String(c.do||'').toLowerCase();
+    if(!CMD_NAMES.has(d)){ errs.push(`#${i+1}: unknown command "${c.do}"`); return; }
+    if(d==='scene') return;                                  // checked as a whole by build_map
+    tok(c.t,i,'t'); tok(c.target,i,'target'); tok(c.attacker,i,'attacker');
+    sq(c.to,i,'to'); sq(c.at,i,'at'); sq(c.from,i,'from');
+    if(d==='move'&&c.to===undefined) errs.push(`#${i+1}: move needs "to"`);
+    if((d==='damage'||d==='heal')&&!Number.isFinite(+(c.n??c.hp))) errs.push(`#${i+1}: ${d} needs a number "n"`);
+    if((d==='attack'||d==='strike')&&c.target===undefined) errs.push(`#${i+1}: attack needs "target"`);
+    if((d==='attack'||d==='strike'||d==='save')&&c.damage!==undefined){ try{ parseDice(String(c.damage)); }catch(e){ errs.push(`#${i+1}: damage "${c.damage}" is not dice like 2d6+3`); } }
+    if((d==='check'||d==='save')&&c.dc!==undefined&&!Number.isFinite(+c.dc)) errs.push(`#${i+1}: dc must be a number`);
+    if(d==='spawn'){ const t=c.token||{};
+      if(!t.at) errs.push(`#${i+1}: spawn needs token.at`); else sq(t.at,i,'token.at');
+      if(t.id&&S.tokens.some(x=>x.id===String(t.id))) errs.push(`#${i+1}: a token with id "${t.id}" is already on the board`); }
+    if(d==='marker'&&c.marker) sq(c.marker.at,i,'marker.at');
+    if(d==='roll'){ try{ parseDice(String(c.dice||c.d||'d20')); }catch(e){ errs.push(`#${i+1}: "${c.dice}" is not dice`); } }
+  });
+  return errs;
+}
+const BLOCK_CELL=new Set(['pit','rock','chasm']);
+function placementProblems(){
+  const out=[];
+  for(const t of S.tokens){ if(t.hidden) continue;
+    const ty=typeGrid[t.r]&&typeGrid[t.r][t.c];
+    if(BLOCK_CELL.has(ty)) out.push(`${t.name} would stand inside ${ty==='chasm'?'a chasm':'solid wall'} at ${refOf(t.r,t.c)}`);
+    else if(solidGrid[t.r]&&solidGrid[t.r][t.c]) out.push(`${t.name} would stand inside a solid prop at ${refOf(t.r,t.c)}`); }
+  return out;
+}
+/* Apply as one transaction: every command or none. A failure rolls the board
+   back and the error goes back to the model, which fixes it and tries again. */
+function applyTransaction(cmds, by){
+  const errs=checkCmds(cmds);
+  if(errs.length) throw new Error('Nothing was applied. Fix these and call again:\n- '+errs.join('\n- '));
+  const before=deep(S), results=[];
+  try{
+    for(const c of cmds) results.push(applyCmd(c));
+    const bad=placementProblems();
+    if(bad.length) throw 'illegal positions: '+bad.join('; ');
+  }catch(err){
+    S=before; buildBoard(); refreshFOW();
+    throw new Error('Nothing was applied (the board was rolled back). '+(typeof err==='string'?err:err.message)+'. Fix the command and call again.');
+  }
+  undoStack=[before];
+  for(const m of results) logLine((by?by+' · ':'')+m, /^GM:/.test(m)?'say':'');
+  save();
+  return results;
+}
+
+/* ---------- tools the models may call ---------- */
+/* models sometimes send the array as a JSON string, or a single object */
+function asCmds(c){ if(typeof c==='string'){ try{ c=JSON.parse(c); }catch(e){ return c; } } return c&&!Array.isArray(c)&&c.do?[c]:c; }
+const TOOL_ROLL={name:'roll_dice', description:'Roll dice on the table for everyone to see. Use it for any roll no board command covers (a recall knowledge check with no token, a random encounter, a d100 table). Returns the total, each die, and the degree of success when a DC is given.',
+  input_schema:{type:'object', properties:{dice:{type:'string', description:'Dice expression: d20+7, 2d6+3, 4d6kh3, d100'},
+    label:{type:'string', description:'What the roll is for'}, dc:{type:'integer', description:'Optional DC to grade the roll against'}}, required:['dice']},
+  run:i=>{ const r=rollDice(String(i.dice), i.label?String(i.label):undefined, false, {dc:i.dc!==undefined?+i.dc:undefined, by:'Claude'});
+    return {total:r.total, rolls:r.rolls, natural:r.nat, ...(r.degreeName?{degree:r.degreeName}:{}), text:r.txt}; },
+  note:(i,r)=>`🎲 ${r.text}`};
+const TOOL_APPLY={name:'apply_commands', description:'Change the board: move tokens, make attacks, saves and checks (the board rolls the dice), apply damage and conditions, run initiative and turns. All commands apply together or not at all. Returns what each command did, including every die rolled, and the board afterwards. On an error nothing changes: read it, fix the command and call again.',
+  input_schema:{type:'object', properties:{commands:{type:'array', items:{type:'object'}, description:'Board commands, see the command reference'},
+    why:{type:'string', description:'One short line on what this does, for the log'}}, required:['commands']},
+  run:i=>{ const res=applyTransaction(asCmds(i.commands),'✦'); return {applied:res, board:boardBrief()}; },
+  note:(i,r)=>r.applied.map(x=>'✓ '+x).join('\n')};
+const TOOL_SUGGEST={name:'suggest_commands', description:'Propose board changes for the GM to apply with one tap (move a token, add a condition, apply damage, start combat). They are checked now and only applied if the GM agrees. Returns whether they are valid; fix and call again if not.',
+  input_schema:{type:'object', properties:{commands:{type:'array', items:{type:'object'}},
+    summary:{type:'string', description:'One line the GM reads on the Apply button card'}}, required:['commands','summary']},
+  run:(i,ctx)=>{ const cmds=asCmds(i.commands), errs=checkCmds(cmds);
+    if(errs.length) throw new Error('Not valid:\n- '+errs.join('\n- '));
+    ctx.suggest(cmds, String(i.summary||'Apply these changes'));
+    return 'Shown to the GM with an Apply button. Mention it in one short line; do not repeat the JSON.'; }};
+
+/* ---------- the engines ---------- */
+async function callAPI(body, {onText, signal}){
+  const key=getKey();
+  if(!key) throw {code:'no_key', message:'Add your API key first.'};
+  let res;
+  try{
+    res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST', signal,
+      headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2026-10-21',
+        'anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({...body, stream:true})});
+  }catch(e){
+    if(e&&e.name==='AbortError') throw {code:'cancelled'};
+    throw {code:'network', message:"Couldn't reach api.anthropic.com from this page. Inside a claude.ai artifact the page can't call out: switch the engine to “this page” (the Claude account of whoever opens it), or open the downloaded index.html in your browser."};
+  }
+  if(!res.ok){
+    let msg=''; try{ const j=await res.json(); msg=j.error&&j.error.message||''; }catch(e){}
+    const why={401:'The API refused that key (401). Check it at console.anthropic.com, or forget it and paste it again.',
+      403:'That key isn’t allowed to do this (403). '+msg, 429:'Rate limited (429). Wait a moment and try again.',
+      529:'Claude is overloaded right now (529). Try again in a minute.', 400:'The request was refused (400): '+msg}[res.status];
+    throw {code:'http_'+res.status, message:why||`API error ${res.status}: ${msg}`};
+  }
+  const reader=res.body.getReader(), dec=new TextDecoder();
+  const msg={content:[], stop_reason:null, usage:{}};
+  let buf='', text='';
+  const handle=(ev,data)=>{
+    if(ev==='message_start'){ Object.assign(msg.usage, data.message.usage||{}); msg.model=data.message.model; }
+    else if(ev==='content_block_start'){ const b={...data.content_block}; if(b.type==='tool_use'){ b._json=''; b.input={}; }
+      if(b.type==='text') b.text=b.text||''; msg.content[data.index]=b; }
+    else if(ev==='content_block_delta'){ const b=msg.content[data.index], d=data.delta; if(!b) return;
+      if(d.type==='text_delta'){ b.text+=d.text; text+=d.text; onText&&onText(text); }
+      else if(d.type==='input_json_delta') b._json+=d.partial_json;
+      else if(d.type==='thinking_delta') b.thinking=(b.thinking||'')+d.thinking;
+      else if(d.type==='signature_delta') b.signature=d.signature; }
+    else if(ev==='content_block_stop'){ const b=msg.content[data.index];
+      if(b&&b.type==='tool_use'){ try{ b.input=b._json?JSON.parse(b._json):{}; }catch(e){ b.input={__bad_json:b._json}; } delete b._json; } }
+    else if(ev==='message_delta'){ if(data.delta&&data.delta.stop_reason) msg.stop_reason=data.delta.stop_reason;
+      if(data.usage) Object.assign(msg.usage, data.usage); }
+    else if(ev==='error'){ throw {code:'stream_error', message:(data.error&&data.error.message)||'stream error'}; }
+  };
+  try{
+    for(;;){
+      const {done, value}=await reader.read(); if(done) break;
+      buf+=dec.decode(value,{stream:true});
+      let k;
+      while((k=buf.indexOf('\n\n'))>=0){
+        const chunk=buf.slice(0,k); buf=buf.slice(k+2);
+        let ev='message', data='';
+        for(const line of chunk.split('\n')){
+          if(line.startsWith('event:')) ev=line.slice(6).trim();
+          else if(line.startsWith('data:')) data+=line.slice(5).trim(); }
+        if(data) handle(ev, JSON.parse(data));
+      }
+    }
+  }catch(e){
+    if(e&&e.name==='AbortError') throw {code:'cancelled'};
+    throw e&&e.code?e:{code:'stream_error', message:'The connection dropped mid-answer.'};
+  }
+  msg.content=msg.content.filter(Boolean);
+  tally(body.model, msg.usage);
+  return msg;
+}
+function tally(model,u){
+  const p=PRICES[model]||PRICES['claude-sonnet-5-5'];
+  const inp=u.input_tokens||0, out=u.output_tokens||0, cr=u.cache_read_input_tokens||0, cw=u.cache_creation_input_tokens||0;
+  USAGE.in+=inp; USAGE.out+=out; USAGE.cacheR+=cr; USAGE.cacheW+=cw; USAGE.calls++;
+  USAGE.usd+=(inp*p[0]+out*p[1]+cr*p[2]+cw*p[0]*1.25)/1e6;
+  renderUsage();
+}
+/* One agent turn: a system prompt, the conversation, a few tools. Runs the
+   tool loop itself on the key engine; hands the tools to the page's Claude on
+   the sample engine. Resolves {text, turns} where turns are the new messages
+   to keep (key engine only, with thinking blocks dropped so trimming old
+   history later never trips preserved-thinking checks). */
+async function runAgent({system, history=[], user, tools=[], model, effort='low', maxTokens=2500, onText, onTool, signal, ctx={}, rounds=8}){
+  if(engine()==='off') throw {code:'off', message:'Claude is switched off in the panel.'};
+  if(engine()==='page'){
+    if(tools.length&&!SAMPLE_TOOLS) throw {code:'tools_unavailable', message:'This view can’t run board tools with “this page”. Use your API key for this, or open the page in the Claude app.'};
+    const past=history.map(m=>`${m.role==='user'?'GM':'You'}: ${typeof m.content==='string'?m.content:m.content.filter(b=>b.type==='text').map(b=>b.text).join('\n')}`).join('\n\n');
+    const input=`${system}\n\n${past?'CONVERSATION SO FAR\n'+past+'\n\n':''}${user}`;
+    const sTools=tools.map(t=>({name:t.name, description:t.description, inputSchema:t.input_schema,
+      execute:async inp=>{ const r=await t.run(inp,ctx); onTool&&onTool(t,inp,r); return r; }}));
+    try{
+      const r=await SAMPLE(input,{onText:u=>onText&&onText(u.text), signal, modelTier:TIER_OF[model]||'default',
+        ...(sTools.length?{tools:sTools}:{cache:false})});
+      USAGE.calls++; renderUsage();
+      return {text:r.text, truncated:r.truncated, turns:[{role:'user',content:user},{role:'assistant',content:r.text}]};
+    }catch(e){ throw {code:e.code||'upstream_error', message:SAMPLE_COPY[e.code]||e.message||'Claude couldn’t answer.', text:e.text}; }
+  }
+  const msgs=[...history, {role:'user', content:user}], turns=[{role:'user', content:user}];
+  const apiTools=tools.map(t=>({name:t.name, description:t.description, input_schema:t.input_schema}));
+  let all='';
+  for(let round=0; round<rounds; round++){
+    const body={model, max_tokens:maxTokens, system:[{type:'text', text:system, cache_control:{type:'ephemeral'}}],
+      messages:msgs, output_config:{effort}, ...(apiTools.length?{tools:apiTools}:{})};
+    const prefix=all?all+'\n\n':'';
+    const m=await callAPI(body,{onText:t=>onText&&onText(prefix+t), signal});
+    if(m.stop_reason==='refusal') throw {code:'refused', message:'Claude declined to continue with that. Try rephrasing.'};
+    const txt=m.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+    if(txt) all=prefix+txt;
+    msgs.push({role:'assistant', content:m.content});
+    turns.push({role:'assistant', content:m.content.filter(b=>b.type!=='thinking'&&b.type!=='redacted_thinking')});
+    if(m.stop_reason!=='tool_use') return {text:all, truncated:m.stop_reason==='max_tokens', turns};
+    const results=[];
+    for(const b of m.content.filter(b=>b.type==='tool_use')){
+      const t=tools.find(x=>x.name===b.name);
+      let out, err=false;
+      try{
+        if(!t) throw new Error('no such tool');
+        if(b.input&&b.input.__bad_json!==undefined) throw new Error('the tool input was not valid JSON');
+        out=await t.run(b.input||{}, ctx); onTool&&onTool(t,b.input,out);
+      }catch(e){ err=true; out=String(e&&e.message||e); onTool&&onTool(t,b.input,null,out); }
+      results.push({type:'tool_result', tool_use_id:b.id, content:typeof out==='string'?out:JSON.stringify(out), ...(err?{is_error:true}:{})});
+    }
+    msgs.push({role:'user', content:results}); turns.push({role:'user', content:results});
+  }
+  return {text:all||'(stopped after too many tool rounds)', truncated:true, turns};
+}
+const SAMPLE_COPY={not_granted:'This page isn’t allowed to use Claude. Allow it from the artifact’s menu, or use your own API key.',
+  rate_limited:'You’ve hit your Claude usage limit for now. Try again later, or use your own API key.',
+  refused:'Claude declined to continue with that. Try rephrasing.', session_expired:'Sign in to Claude again, then retry.',
+  sampling_disabled:'Claude isn’t available for this account here.', upstream_error:'Claude had a hiccup. Try again.',
+  prompt_too_large:'Too much to send at once. Start a new chat.', empty_completion:'Claude came back empty. Try asking differently.'};
+/* JSON out of a model: fenced or bare, the first object found */
+function pickJSON(t){
+  const f=t.match(/```(?:json)?\s*([\s\S]*?)```/); const s=f?f[1]:t;
+  const a=s.indexOf('{'), b=s.lastIndexOf('}');
+  if(a<0||b<=a) throw new Error('no JSON object in the reply');
+  return JSON.parse(s.slice(a,b+1));
+}
+
+/* ---------- the panel ---------- */
+const CL={busy:null, log:[], chat:[], narr:{turns:[], count:0, notes:[], beat:'', auto:true, last:null}, map:{brief:'', grade:true}};
+try{ const raw=localStorage.getItem('vtt-claude'); if(raw){ const o=JSON.parse(raw);
+  CL.log=o.log||[]; CL.narr.turns=o.turns||[]; CL.narr.notes=o.notes||[]; CL.narr.beat=o.beat||''; CL.narr.count=o.count||0; CL.narr.last=o.last||null; } }catch(e){}
+function saveCL(){ try{ localStorage.setItem('vtt-claude', JSON.stringify({log:CL.log.slice(-60), turns:CL.narr.turns.slice(-24),
+  notes:CL.narr.notes, beat:CL.narr.beat, count:CL.narr.count, last:CL.narr.last})); }catch(e){} }
+function md(s){
+  return esc(s).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>')
+    .split(/\n{2,}/).map(p=>/^\s*[-•] /m.test(p)?'<ul>'+p.split('\n').map(l=>l.replace(/^\s*[-•] /,'')).filter(Boolean).map(l=>'<li>'+l+'</li>').join('')+'</ul>'
+      :'<p>'+p.replace(/\n/g,'<br>')+'</p>').join('');
+}
+function pcName(i){ const pcs=S.tokens.filter(t=>t.kind==='pc'&&!t.gone); return (pcs[i]||pcs[0]||{name:'the fighter'}).name; }
+function renderClaude(){
+  const box=$('p-claude'), eng=engine(), kw=keyWhere();
+  const opt=(v,l,cur)=>`<option value="${v}"${v===cur?' selected':''}>${esc(l)}</option>`;
+  box.innerHTML=`
+    <div class="cl-grid"><span class="dim">engine</span><div class="row2 cl-eng">
+      <button class="btn seg${eng==='key'?' on':''}" data-eng="key" title="bring your own Anthropic API key">your key</button>
+      <button class="btn seg${eng==='page'?' on':''}" data-eng="page"${SAMPLE?' title="the Claude account of whoever opens this page"':' disabled title="only when this page runs as a Claude artifact"'}>this page</button>
+      <button class="btn seg${eng==='off'?' on':''}" data-eng="off">off</button></div></div>
+    ${eng==='key'?(kw?`<div class="row2 cl-key"><span class="ok">✓ key set</span><span class="dim">${{tab:'for this tab only',device:'remembered on this device',page:'until you reload'}[kw]} · sent only to api.anthropic.com</span>
+        <button class="btn" id="clforget">forget key</button></div>`
+      :`<div class="row2 cl-key"><input class="inp" id="clkey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-… (your Anthropic API key)" style="flex:1" aria-label="Anthropic API key">
+        <button class="btn primary" id="clsetkey">use key</button></div>
+        <div class="row2"><label class="tog"><input type="checkbox" id="clremember"> remember on this device</label>
+        <span class="dim">otherwise it’s gone when you close the tab. It is sent only to api.anthropic.com, from this browser.</span></div>`)
+      :eng==='page'?`<div class="dim cl-note">Using the Claude account of whoever opens this page. No key needed${SAMPLE_TOOLS?'':'; this view can’t run board tools, so only the rules chat works'}.</div>`
+      :`<div class="dim cl-note">Claude is off. The board, builder and dice all work without it.</div>`}
+    <div class="cl-grid">
+      <span class="dim">model</span><select class="inp" id="clmodel" title="answers rules questions, narrates and builds maps">${MODELS.map(([v,l])=>opt(v,l,SET.model)).join('')}</select>
+      <span class="dim">director</span><select class="inp" id="cldmodel" title="grades the narration and the maps">${MODELS.map(([v,l])=>opt(v,l,SET.dmodel)).join('')}</select>
+      <span class="dim">rules</span><div class="row2" style="margin:0">${['pf2e','5e'].map(r=>`<button class="btn seg${rules()===r?' on':''}" data-clrules="${r}">${r==='pf2e'?'PF2e':'5e'}</button>`).join('')}
+      <span id="clusage" class="dim" style="margin-left:auto"></span></div></div>
+    <div class="row2 cl-modes">${[['rules','✦ rules'],['narrator','☗ narrator'],['map','▦ map maker']]
+      .map(([m,l])=>`<button class="btn seg${SET.cmode===m?' on':''}" data-cmode="${m}">${l}</button>`).join('')}</div>
+    <div id="clbody"></div>`;
+  renderMode(); renderUsage();
+}
+function renderUsage(){
+  const el=$('clusage'); if(!el) return;
+  el.textContent=engine()==='page'?(USAGE.calls?`${USAGE.calls} calls · on your Claude plan`:'')
+    :USAGE.calls?`${USAGE.calls} calls · ${((USAGE.in+USAGE.cacheR+USAGE.cacheW)/1000).toFixed(1)}k in · ${(USAGE.out/1000).toFixed(1)}k out · ≈$${USAGE.usd.toFixed(USAGE.usd<0.1?4:2)}`:'';
+}
+function renderMode(){
+  const box=$('clbody'); if(!box) return;
+  const m=SET.cmode, busy=!!CL.busy;
+  let head='';
+  if(m==='rules') head=`<div class="dim cl-note">Ask about a rule, a monster, what someone can do on their turn. Claude sees the board, rolls on the tray, and can propose changes you apply with a tap.</div>
+    <div class="row2 cl-chips">${['How does flanking work here?',`What can ${pcName(0)} do this turn?`,'Start combat and roll initiative','Build a fair encounter for this party'].map(q=>`<button class="btn ask" data-ask="${esc(q)}">${esc(q)}</button>`).join('')}</div>`;
+  else if(m==='narrator') head=`<details class="cl-brief"${CL.narr.turns.length?'':' open'}><summary class="dim">campaign brief</summary>
+      <textarea class="inp" id="clbrief" rows="4">${esc(SET.brief)}</textarea></details>
+    <div class="row2"><label class="tog"><input type="checkbox" id="clauto"${CL.narr.auto?' checked':''}> run the monsters’ turns</label>
+      <span class="dim">director every</span><input class="inp" id="clevery" value="${SET.every}" style="width:40px" inputmode="numeric" aria-label="director cadence"><span class="dim">turns</span>
+      <button class="btn" id="cldirect"${busy?' disabled':''}>ask the director</button></div>
+    ${CL.narr.notes.length||CL.narr.beat?`<div class="cl-notes"><b>Director’s notes</b>${CL.narr.notes.map(n=>`<div>· ${esc(n)}</div>`).join('')}${CL.narr.beat?`<div class="dim">next beat: ${esc(CL.narr.beat)}</div>`:''}</div>`:''}
+    <div class="row2 cl-chips">${['Begin the scene','Roll initiative and start the fight',`${pcName(0)} charges the nearest foe`,`${pcName(1)} looks for a way to flank`].map(q=>`<button class="btn ask" data-ask="${esc(q)}">${esc(q)}</button>`).join('')}</div>`;
+  else head=`<div class="dim cl-note">Describe the fight. Claude builds the map from the same tiles, props and portraits as the builder, every square is checked (nobody in a wall, everyone can reach everyone), and it’s rebuilt until it passes.</div>
+    <textarea class="inp" id="clmapbrief" rows="3" placeholder="A bridge over a chasm at night, cultists holding the far side, a collapsed tower for cover…">${esc(CL.map.brief)}</textarea>
+    <div class="row2"><label class="tog"><input type="checkbox" id="clgrade"${CL.map.grade?' checked':''}> director grades it and asks for a rebuild if it’s weak</label>
+      <button class="btn primary" id="clmapgo" style="margin-left:auto"${busy?' disabled':''}>build the map</button></div>`;
+  box.innerHTML=head+`<div id="cllog" class="cl-log" aria-live="polite"></div>
+    ${m==='map'?'':`<div class="cl-input"><textarea class="inp" id="clin" rows="2" placeholder="${m==='rules'?'Ask the rules assistant…':'What do the players do?'}"></textarea>
+      <div class="col"><button class="btn primary" id="clsend"${busy?' disabled':''}>${m==='rules'?'ask':'act'}</button>
+      ${busy?'<button class="btn" id="clstop">stop</button>':`<button class="btn" id="clclear" title="start over">new</button>`}</div></div>`}
+    ${m==='map'&&busy?'<div class="row2"><button class="btn" id="clstop">stop</button></div>':''}`;
+  renderLog();
+}
+function renderLog(){
+  const box=$('cllog'); if(!box) return;
+  const items=CL.log.filter(e=>e.mode===SET.cmode).slice(-40);
+  box.innerHTML=items.length?items.map(e=>logItemHTML(e)).join(''):`<div class="dim cl-empty">${{rules:'No questions yet.',narrator:'The table is quiet. Tell Claude what the players do, or tap “Begin the scene”.',map:'No maps built yet.'}[SET.cmode]}</div>`;
+  box.scrollTop=box.scrollHeight;
+  const ch=document.querySelector('#p-claude .cl-chips');      // starter questions step aside once the chat starts
+  if(ch&&SET.cmode==='rules') ch.hidden=items.length>0;
+}
+function logItemHTML(e){
+  if(e.k==='you') return `<div class="cl-msg you">${md(e.text)}</div>`;
+  if(e.k==='tool') return `<div class="cl-tool${e.err?' err':''}">${esc(e.text)}</div>`;
+  if(e.k==='err') return `<div class="cl-msg err">${esc(e.text)}</div>`;
+  if(e.k==='suggest') return `<div class="cl-sug"><div>${esc(e.text)}</div><div class="dim">${e.cmds.map(c=>esc(c.do)).join(' · ')}</div>
+    ${e.done?`<div class="ok">${esc(e.done)}</div>`:`<button class="btn primary" data-apply="${e.id}">apply to board</button> <button class="btn" data-dismiss="${e.id}">dismiss</button>`}</div>`;
+  if(e.k==='director') return `<div class="cl-dir"><div class="h3">director · ${e.avg.toFixed(1)}/10</div>
+    ${Object.entries(e.scores).map(([k,v])=>`<div class="bar"><span>${esc(k.replace(/_/g,' '))}</span><i style="--v:${clamp(+v||0,0,10)*10}%"></i><b>${esc(String(v))}</b></div>`).join('')}
+    <div>${esc(e.summary||'')}</div></div>`;
+  return `<div class="cl-msg ${e.k}">${md(e.text||'…')}${e.trunc?'<div class="dim">(cut short)</div>':''}</div>`;
+}
+let logSeq=0;
+function pushLog(e){ e.id=++logSeq+'_'+Date.now(); e.mode=e.mode||SET.cmode; CL.log.push(e); if(CL.log.length>120) CL.log.splice(0,CL.log.length-120); renderLog(); saveCL(); return e; }
+function liveBubble(kind){
+  const e=pushLog({k:kind, text:''});
+  return {e, set:t=>{ e.text=t; const box=$('cllog'); if(!box) return;
+    const last=[...box.querySelectorAll('.cl-msg.'+kind)].pop(); if(last){ last.innerHTML=md(t||'…'); box.scrollTop=box.scrollHeight; } }};
+}
+function begin(label){
+  const ctl=new AbortController(); CL.busy={ctl,label};
+  renderMode(); measure.textContent='✦ '+label+'…';
+  return ctl.signal;
+}
+function finish(){ CL.busy=null; renderMode(); saveCL(); }
+function fail(e){
+  if(e&&e.code==='cancelled'){ pushLog({k:'tool', text:'stopped'}); return; }
+  pushLog({k:'err', text:(e&&e.message)||String(e)});
+}
+const toolNote=(t,inp,r,err)=>{
+  if(err){ pushLog({k:'tool', err:true, text:`✗ ${t?t.name:'tool'}: ${err.split('\n')[0].slice(0,160)}`}); return; }
+  if(t&&t.note) pushLog({k:'tool', text:t.note(inp,r)});
+};
+
+/* rules assistant */
+function rulesSystem(){
+  return `You are the rules assistant at a ${RULES_NAME[rules()]} table, helping the human GM run a fight on a virtual tabletop.
+Answer like a sharp, friendly GM sitting beside them: lead with the answer, then the rule that decides it, in a few sentences. Quote rule names and numbers exactly (actions, DCs, conditions). If something depends on a rule you aren't sure of, say so plainly rather than guessing. Use the board state you're given: names, squares (row letter + column), HP, conditions, initiative.
+Roll with roll_dice whenever the GM asks for a roll. When a change to the board would help (start combat, move someone, apply damage or a condition), propose it with suggest_commands so the GM can apply it with a tap; never claim the board changed.
+Plain text, no headers. Short bullet lists only for options.
+
+${COMMAND_CARD}`;
+}
+async function askRules(q){
+  pushLog({k:'you', text:q});
+  const signal=begin('thinking'), live=liveBubble('ai');
+  const ctx={suggest:(cmds,summary)=>pushLog({k:'suggest', text:summary, cmds})};
+  try{
+    const r=await runAgent({system:rulesSystem(), history:CL.chat, user:boardText()+'\n\nGM: '+q, tools:[TOOL_ROLL,TOOL_SUGGEST],
+      model:SET.model, effort:'low', maxTokens:2000, onText:live.set, onTool:toolNote, signal, ctx});
+    live.e.text=r.text; live.e.trunc=r.truncated;
+    CL.chat.push(...r.turns); if(CL.chat.length>24) CL.chat=trimHistory(CL.chat,24);
+    live.set(r.text);
+  }catch(e){ if(!live.e.text) CL.log.splice(CL.log.indexOf(live.e),1); fail(e); }
+  finish();
+}
+/* keep the last n messages, starting on a plain user turn so no tool result is orphaned */
+function trimHistory(h,n){
+  let i=Math.max(0,h.length-n);
+  while(i<h.length&&!(h[i].role==='user'&&typeof h[i].content==='string')) i++;
+  return h.slice(i);
+}
+
+/* narrator + director */
+function narratorSystem(){
+  const notes=CL.narr.notes.length||CL.narr.beat?`\n\nTHE DIRECTOR'S NOTES FOR YOU (follow them):\n${CL.narr.notes.map(n=>'- '+n).join('\n')}${CL.narr.beat?'\nNext beat to steer toward: '+CL.narr.beat:''}`:'';
+  return `You are the Narrator: the game master running this ${RULES_NAME[rules()]} table, live, on a virtual tabletop. The players control their characters; you control everything else.
+The board is the source of truth for positions, hit points, conditions, initiative and dice. You never invent a roll or a number: every attack, save, check and damage roll goes through apply_commands, and you narrate what the board says happened.
+
+Each turn you get the board, the story so far and what the players do. Then:
+1. Resolve it under the rules: call apply_commands with move, attack, save, check, damage and cond commands, using each creature's real bonuses (estimate sensible ones for its level if unknown and keep them consistent). Use roll_dice only for rolls no command covers.
+2. If a call fails, nothing changed: read the error, fix the command and call again.
+3. When it is a monster's turn${CL.narr.auto?', play it':', stop and say so'}: smart, in character, using cover and terrain, then end its turn with {"do":"next"}. Keep going until a player character's turn comes up, then stop.
+4. Out of combat, when a fight starts, call {"do":"combat"} to roll initiative.
+5. Finish with narration: two to five vivid sentences, present tense, speaking to the players, ending on what they now see or face, and whose turn it is. No dice maths or rule names in the narration, no lists, no headers.
+Never decide what a player character does, says or feels. Keep to the campaign brief.
+
+CAMPAIGN BRIEF: ${SET.brief||'(none)'}${notes}
+
+${COMMAND_CARD}`;
+}
+function narrUser(action){
+  const recent=CL.narr.turns.slice(-10).map(t=>`${t.who==='player'?'PLAYERS':t.who==='narrator'?'YOU':'DIRECTOR'}: ${t.text}`).join('\n\n');
+  const rolls=ROLL_LOG.slice(0,6).map(r=>`${r.label||r.spec}: ${r.total}${r.degreeName?' ('+r.degreeName+')':''}`).join('; ');
+  return `${boardText()}\n\n${recent?'STORY SO FAR (most recent last)\n'+recent+'\n\n':''}${rolls?'RECENT ROLLS: '+rolls+'\n\n':''}PLAYERS: ${action}`;
+}
+async function narrate(action){
+  pushLog({k:'you', text:action}); CL.narr.turns.push({who:'player', text:action});
+  const signal=begin('narrating');
+  try{
+    let act=action, hops=0;
+    for(;;){
+      const live=liveBubble('narr');
+      const r=await runAgent({system:narratorSystem(), user:narrUser(act), tools:[TOOL_ROLL,TOOL_APPLY], model:SET.model,
+        effort:'medium', maxTokens:3000, onText:live.set, onTool:toolNote, signal, rounds:10});
+      live.e.text=r.text; live.e.trunc=r.truncated; live.set(r.text);
+      CL.narr.turns.push({who:'narrator', text:r.text}); CL.narr.count++;
+      if(CL.narr.count%Math.max(2,+SET.every||8)===0) await direct(signal);
+      const cur=S.initiative[S.active], tk=cur&&cur.t?S.tokens.find(t=>t.id===cur.t):null;
+      if(!CL.narr.auto||!tk||tk.kind==='pc'||tk.kind==='ally'||++hops>=4) break;
+      act=`(It is ${tk.name}'s turn. Play the monsters until a player character is up.)`;
+    }
+  }catch(e){ fail(e); }
+  finish();
+}
+const RUBRIC=['narrative_coherence','encounter_pacing','lore_consistency','player_agency','tone_calibration','rule_accuracy','dramatic_tension'];
+async function direct(signal){
+  const own=!signal; if(own) signal=begin('the director is watching');
+  try{
+    const story=CL.narr.turns.slice(-16).map(t=>`${t.who.toUpperCase()}: ${t.text}`).join('\n\n');
+    const sys=`You are the Director. You watch a Narrator (another model) run a tabletop session and grade it, then steer the next stretch, the way a showrunner gives notes to a writer.
+Grade each dimension from 1 to 10, harshly but fairly: ${RUBRIC.join(', ')}. rule_accuracy is about ${RULES_NAME[rules()]}.
+Reply with only a JSON object: {"scores":{${RUBRIC.map(k=>`"${k}":0`).join(',')}},"summary":"one sentence","notes_for_narrator":["up to three short, concrete instructions"],"next_beat":"one sentence on what should happen soon"}`;
+    const user=`CAMPAIGN BRIEF: ${SET.brief}\n\n${boardText()}\n\nTHE SESSION SO FAR\n${story||'(nothing yet)'}`;
+    const r=await runAgent({system:sys, user, model:SET.dmodel, effort:'medium', maxTokens:1500, signal});
+    const j=pickJSON(r.text);
+    const scores={}; for(const k of RUBRIC) scores[k]=clamp(Math.round(+((j.scores||{})[k])||0),0,10);
+    const avg=RUBRIC.reduce((a,k)=>a+scores[k],0)/RUBRIC.length;
+    CL.narr.notes=[].concat(j.notes_for_narrator||[]).map(String).slice(0,3);
+    CL.narr.beat=String(j.next_beat||''); CL.narr.last={scores, avg, at:Date.now()};
+    pushLog({k:'director', mode:'narrator', scores, avg, summary:String(j.summary||'')});
+    CL.narr.turns.push({who:'director', text:`(notes) ${CL.narr.notes.join(' ')}`});
+  }catch(e){ if(e&&e.code==='cancelled') throw e; pushLog({k:'err', mode:'narrator', text:'Director: '+((e&&e.message)||e)}); }
+  if(own) finish();
+}
+
+/* map maker */
+function mapSystem(){
+  const props=Object.entries(ASSET_PROPS).map(([g,ks])=>`${g}: ${ks.map(k=>PROP_SIZES[k]?`${k}(${PROP_SIZES[k].join('x')})`:k).join(' ')}`).join('\n');
+  return `You design tactical battle maps for a ${RULES_NAME[rules()]} virtual tabletop, and you build them with the build_map tool.
+A scene is JSON: {"header","sub","rows","cols","ground","zones":[{"from":"A1","to":"C4","type":…}],"props":[{"kind","at","w","h"}],"lights":[{"at","bright","dim"}],"tokens":[…],"fow":{"on","ambient"},"weather":{"type","intensity"},"legend":[["label","#hex"]]}.
+Squares are a row letter and a column number ("E7"); rows and cols between 10 and 20; zones are rectangles (from = top-left, to = bottom-right) and later zones paint over earlier ones.
+
+ASSET LIBRARY (use only these)
+floors (ground, or as a zone type to lay a different floor): ${ASSET_GROUNDS.map(g=>g[0]).join(' ')}
+terrain zone types: ${ASSET_ZONES.map(z=>`${z[0]} (${z[2]})`).join(', ')}. Use "rock" for the solid mass of caves and dungeons, "pit" for built masonry walls one square thick.
+props (size in squares where bigger than 1):
+${props}
+walls as props: wall, woodwall, lowwall (cover only). A door is a "door" prop in a one-square gap of a wall.
+token portraits ("art"): ${Object.keys(PIXEL_ART).join(' ')}
+weather: ${WEATHERS.join(' ')} · ambient light: bright dim dark
+
+TOKENS: {"id","name","at","kind":"pc"|"ally"|"foe","art","hp","ac","init","size"}. Every token needs hp, ac and an init bonus. Keep the party exactly as given (same ids, names, art and numbers); place them together on one side.
+
+A good map: two or three terrain features that matter tactically (cover, a chokepoint, difficult ground, a hazard, high-value position), room to move, no dead space, foes placed with intent, light sources if it's dark, and a title and subtitle with atmosphere. Build it with build_map. The tool checks it and returns problems or a text picture of what you built; fix problems and build again. When it's sound, reply with two sentences on the tactical idea of the map.`;
+}
+function partyNow(){
+  return S.tokens.filter(t=>t.kind==='pc'||t.kind==='ally').map(t=>({id:t.id, name:t.name, kind:t.kind,
+    ...(t.art?{art:t.art}:{icon:t.icon}), ...(t.hp?{hp:t.hp.max}:{}), ...(t.ac!==undefined?{ac:t.ac}:{}), ...(t.init!==undefined?{init:t.init}:{})}));
+}
+function sceneProblems(sc){
+  const out=[];
+  if(!sc||typeof sc!=='object') return ['scene must be an object'];
+  const rows=+sc.rows||16, cols=+sc.cols||16;
+  if(rows<8||rows>26||cols<8||cols>26) out.push('rows and cols must be between 8 and 26');
+  if(sc.ground&&!GROUNDS.has(sc.ground)) out.push(`unknown ground "${sc.ground}"`);
+  const inB=ref=>{ if(typeof ref!=='string'||!REF_RE.test(ref)) return false; const p=parseRef(ref); return p.r>=0&&p.c>=0&&p.r<rows&&p.c<cols; };
+  (sc.zones||[]).forEach((z,i)=>{ const ty=z.type==='wall'?'pit':z.type;
+    if(!ZONE_TYPES.has(ty)&&!GROUNDS.has(ty)) out.push(`zone ${i+1}: unknown type "${z.type}"`);
+    if(!inB(z.from)||!inB(z.to||z.from)) out.push(`zone ${i+1}: ${z.from}–${z.to} is off the board`); });
+  (sc.props||[]).forEach((p,i)=>{ if(p.glyph) return;
+    if(!ALL_PROPS.has(p.kind)&&!['door','secretdoor'].includes(p.kind)) out.push(`prop ${i+1}: unknown kind "${p.kind}"`);
+    if(!inB(p.at)) out.push(`prop ${i+1} (${p.kind}) at ${p.at} is off the board`); });
+  const toks=sc.tokens||[];
+  if(!toks.some(t=>t.kind==='pc')) out.push('no player characters (kind "pc")');
+  const ids=new Set();
+  toks.forEach((t,i)=>{ const nm=t.name||t.id||('token '+(i+1));
+    if(!inB(t.at)) out.push(`${nm} at ${t.at} is off the board`);
+    if(t.id){ if(ids.has(t.id)) out.push(`duplicate token id "${t.id}"`); ids.add(t.id); }
+    if(t.art&&!PIXEL_ART[t.art]) out.push(`${nm}: unknown art "${t.art}"`);
+    if(!Number.isFinite(+(t.hp&&t.hp.max||t.hp))||!Number.isFinite(+t.ac)) out.push(`${nm} needs hp and ac`); });
+  if(sc.weather&&sc.weather.type&&!WEATHERS.includes(sc.weather.type)) out.push(`unknown weather "${sc.weather.type}"`);
+  return out;
+}
+/* load it for real, then check what got built: walls, reachability, crowding */
+function builtProblems(){
+  const out=placementProblems();
+  const block=(r,c)=>BLOCKING_ZONES.has(typeGrid[r][c])||solidGrid[r][c];
+  let blocked=0; for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++) if(block(r,c)) blocked++;
+  if(blocked/(ROWS*COLS)>0.62) out.push(`the map is ${Math.round(blocked/(ROWS*COLS)*100)}% wall: leave more room to fight`);
+  const vis=S.tokens.filter(t=>!t.hidden);
+  if(vis.length>1&&!out.length){
+    const t0=vis[0], seen=new Set([t0.r*COLS+t0.c]), q=[[t0.r,t0.c]];
+    for(let i=0;i<q.length;i++){ const [r,c]=q[i];
+      for(const [a,b] of [[r-1,c],[r+1,c],[r,c-1],[r,c+1]])
+        if(a>=0&&b>=0&&a<ROWS&&b<COLS&&!block(a,b)&&!seen.has(a*COLS+b)){ seen.add(a*COLS+b); q.push([a,b]); } }
+    const cut=vis.filter(t=>!seen.has(t.r*COLS+t.c));
+    if(cut.length) out.push(`${cut.map(t=>t.name).join(', ')} can't reach ${t0.name}: open a path (a door, a gap, a ford)`);
+  }
+  const pcs=vis.filter(t=>t.kind==='pc'), foes=vis.filter(t=>t.kind==='foe');
+  if(pcs.length&&foes.length){ const d=Math.min(...pcs.flatMap(p=>foes.map(f=>Math.max(Math.abs(p.r-f.r),Math.abs(p.c-f.c)))));
+    if(d<3) out.push('foes start right next to the party: give them some distance'); }
+  return out;
+}
+const TOOL_BUILD={name:'build_map', description:'Build the battle map on the board from a scene object. The scene is checked: unknown assets, squares off the board, tokens inside walls, tokens that cannot reach each other, maps that are mostly wall. Problems come back as an error and the board is left as it was; fix them and build again. On success it returns a text picture of the map so you can check the layout.',
+  input_schema:{type:'object', properties:{scene:{type:'object', description:'The scene JSON'}}, required:['scene']},
+  run:(i,ctx)=>{
+    ctx.attempts=(ctx.attempts||0)+1;
+    const sc=i.scene, pre=sceneProblems(sc);
+    if(pre.length) throw new Error(`Attempt ${ctx.attempts}: not built. Problems:\n- ${pre.join('\n- ')}`);
+    const before=deep(S), wasWorld=WORLD;
+    try{ loadScene(sc); }catch(e){ S=before; WORLD=wasWorld; buildBoard(); throw new Error(`Attempt ${ctx.attempts}: the scene would not load: ${e.message||e}`); }
+    const post=builtProblems();
+    if(post.length){ S=before; WORLD=wasWorld; buildBoard(); refreshFOW();
+      throw new Error(`Attempt ${ctx.attempts}: built, checked and rolled back. Problems:\n- ${post.join('\n- ')}`); }
+    undoStack=[before]; save(); ctx.built=sc;
+    return `Built on attempt ${ctx.attempts}. This is what is on the board now:\n${asciiMap()}\nKey: ${ASCII_KEY}`;
+  },
+  note:(i,r)=>'✓ '+r.split('\n')[0]};
+async function makeMap(brief){
+  pushLog({k:'you', mode:'map', text:brief});
+  const signal=begin('drawing the map'), ctx={};
+  try{
+    const user=`THE FIGHT: ${brief}\n\nTHE PARTY (keep exactly): ${JSON.stringify(partyNow())}`;
+    let live=liveBubble('ai');
+    let r=await runAgent({system:mapSystem(), user, tools:[TOOL_BUILD], model:SET.model, effort:'medium', maxTokens:12000,
+      onText:live.set, onTool:toolNote, signal, ctx, rounds:6});
+    live.e.text=r.text; live.set(r.text);
+    if(!ctx.built) throw {message:'No map was built. Try describing it differently, or use a stronger model.'};
+    if(CL.map.grade){
+      const g=await gradeMap(brief, signal);
+      if(g&&g.score<7&&g.fixes){
+        pushLog({k:'tool', text:`↻ rebuilding: ${g.fixes}`});
+        live=liveBubble('ai'); const ctx2={attempts:ctx.attempts};
+        r=await runAgent({system:mapSystem(), user:`${user}\n\nYOUR LAST MAP (on the board now)\n${asciiMap()}\n\nA reviewer scored it ${g.score}/10 and asks: ${g.fixes}\nBuild an improved version with build_map.`,
+          tools:[TOOL_BUILD], model:SET.model, effort:'medium', maxTokens:12000, onText:live.set, onTool:toolNote, signal, ctx:ctx2, rounds:5});
+        live.e.text=r.text; live.set(r.text);
+        if(ctx2.built) await gradeMap(brief, signal);
+      }
+    }
+  }catch(e){ fail(e); }
+  finish(); if(SIDE_TAB==='build') renderBuilder();
+}
+async function gradeMap(brief, signal){
+  try{
+    const r=await runAgent({system:`You review tactical battle maps for a tabletop game. Score the map from 1 to 10 for how well it serves the fight described: interesting tactical choices, cover, movement, fairness, atmosphere, and whether it matches the brief. Reply with only JSON: {"score":0,"strengths":"one line","fixes":"one or two concrete changes, or empty if none"}`,
+      user:`THE BRIEF: ${brief}\n\nTHE MAP\n${asciiMap()}\nKey: ${ASCII_KEY}\n\nScene title: ${S.header} · ${S.sub}\nTokens: ${JSON.stringify(stateForGM().tokens.map(t=>({name:t.name,at:t.at})))}`,
+      model:SET.dmodel, effort:'low', maxTokens:800, signal});
+    const j=pickJSON(r.text), score=clamp(Math.round(+j.score||0),0,10);
+    pushLog({k:'tool', mode:'map', text:`director: ${score}/10 · ${String(j.strengths||'')}${j.fixes?' · wants: '+j.fixes:''}`});
+    return {score, fixes:String(j.fixes||'')};
+  }catch(e){ if(e&&e.code==='cancelled') throw e; pushLog({k:'tool', mode:'map', err:true, text:'director couldn’t grade it: '+((e&&e.message)||e)}); return null; }
+}
+
+/* panel events */
+$('p-claude').addEventListener('click',e=>{
+  const t=e.target;
+  const eng=t.closest('[data-eng]'); if(eng&&!eng.disabled){ SET.engine=eng.dataset.eng; saveSet(); renderClaude(); return; }
+  const cm=t.closest('[data-cmode]'); if(cm){ SET.cmode=cm.dataset.cmode; saveSet(); renderMode();
+    document.querySelectorAll('[data-cmode]').forEach(b=>b.classList.toggle('on',b===cm)); return; }
+  const cr=t.closest('[data-clrules]'); if(cr){ SET.rules=cr.dataset.clrules; saveSet(); renderClaude(); renderDiceTray(); return; }
+  const ask=t.closest('[data-ask]'); if(ask){ const n=$('clin'); if(n){ n.value=ask.dataset.ask; send(); } return; }
+  const ap=t.closest('[data-apply]'); if(ap){ const it=CL.log.find(x=>x.id===ap.dataset.apply); if(!it) return;
+    try{ const res=applyTransaction(it.cmds,'✦'); it.done='applied · '+res.length+' change'+(res.length>1?'s':''); }
+    catch(err){ it.done='couldn’t apply: '+err.message.split('\n')[0]; }
+    renderLog(); saveCL(); return; }
+  const dm=t.closest('[data-dismiss]'); if(dm){ const it=CL.log.find(x=>x.id===dm.dataset.dismiss); if(it){ it.done='dismissed'; renderLog(); saveCL(); } return; }
+  if(t.id==='clsetkey'){ const v=$('clkey').value.trim();
+    if(!v){ $('clkey').focus(); return; }
+    setKey(v, $('clremember').checked); SET.engine='key'; saveSet(); renderClaude();
+    if(!/^sk-ant-/.test(v)) pushLog({k:'err', text:'That doesn’t look like an Anthropic key (they start with sk-ant-). It’s saved anyway; forget it if it was a mistake.'});
+    return; }
+  if(t.id==='clforget'){ forgetKey(); renderClaude(); return; }
+  if(t.id==='clsend'){ send(); return; }
+  if(t.id==='clstop'&&CL.busy){ CL.busy.ctl.abort(); return; }
+  if(t.id==='clclear'){ if(SET.cmode==='rules') CL.chat=[]; else CL.narr={...CL.narr, turns:[], count:0, notes:[], beat:''};
+    CL.log=CL.log.filter(x=>x.mode!==SET.cmode); saveCL(); renderMode(); return; }
+  if(t.id==='cldirect'&&!CL.busy){ direct(); return; }
+  if(t.id==='clmapgo'&&!CL.busy){ const b=$('clmapbrief').value.trim(); if(!b){ $('clmapbrief').focus(); return; } CL.map.brief=b; makeMap(b); return; }
+});
+$('p-claude').addEventListener('change',e=>{
+  const id=e.target.id;
+  if(id==='clmodel'){ SET.model=e.target.value; saveSet(); }
+  if(id==='cldmodel'){ SET.dmodel=e.target.value; saveSet(); }
+  if(id==='clauto') CL.narr.auto=e.target.checked;
+  if(id==='clevery'){ SET.every=clamp(+e.target.value||8,2,30); saveSet(); }
+  if(id==='clbrief'){ SET.brief=e.target.value; saveSet(); }
+  if(id==='clgrade') CL.map.grade=e.target.checked;
+});
+$('p-claude').addEventListener('input',e=>{ if(e.target.id==='clmapbrief') CL.map.brief=e.target.value; });
+$('p-claude').addEventListener('keydown',e=>{
+  if(e.target.id==='clin'&&e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send(); }
+  if(e.target.id==='clkey'&&e.key==='Enter'){ e.preventDefault(); $('clsetkey').click(); }
+});
+function send(){
+  const n=$('clin'); if(!n||CL.busy) return;
+  const q=n.value.trim(); if(!q) return;
+  n.value='';
+  if(engine()==='key'&&!getKey()){ pushLog({k:'err', text:'Add your API key above first (or pick “this page” when this runs as an artifact).'}); return; }
+  if(SET.cmode==='rules') askRules(q); else narrate(q);
+}
 
 /* =============================== boot =============================== */
 window.VTT={ apply:applyBatch, state:()=>S, stateForGM,
