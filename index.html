@@ -328,6 +328,101 @@
   .cl-live::after{content:'▍'; animation:blink 1s steps(2) infinite; color:var(--lamp)}
   @keyframes blink{50%{opacity:0}}
   @media (prefers-reduced-motion:reduce){ .cl-live::after{animation:none} }
+  /* condition badges: values, overflow, text fallback */
+  .token .cond em{font:700 calc(36% / var(--sz,1)) ui-monospace,monospace; font-style:normal; color:var(--bone); text-transform:uppercase}
+  .token .cond b{position:absolute; right:-28%; bottom:-22%; min-width:58%; height:58%; border-radius:6px; background:var(--lamp);
+    color:#1a1207; font:800 calc(34% / var(--sz,1)) ui-monospace,monospace; display:flex; align-items:center; justify-content:center; line-height:1}
+  .token .cond.bad{border-color:var(--hurt); background:#2a1512}
+  .token .cond.bad svg{fill:#e2705a}
+  .token .cond.more{border-style:dashed}
+  .token.dying{animation:dyingbeat 1.6s ease-in-out infinite}
+  @keyframes dyingbeat{0%,100%{filter:none} 50%{filter:drop-shadow(0 0 6px rgba(226,112,90,.85))}}
+  .token.dead{filter:grayscale(1) brightness(.62); opacity:.8}
+  .token.dead img.art{opacity:.75}
+  @media (prefers-reduced-motion:reduce){ .token.dying{animation:none; filter:drop-shadow(0 0 4px rgba(226,112,90,.8))} }
+  /* strike effects */
+  .bolt{position:absolute; z-index:21; width:22px; height:4px; margin:-2px 0 0 -11px; border-radius:3px; pointer-events:none;
+    background:linear-gradient(90deg,rgba(255,215,140,0),#ffe2a0 70%,#fff); box-shadow:0 0 10px rgba(255,200,110,.9)}
+  .slash{position:absolute; z-index:21; width:64px; height:5px; margin:-2.5px 0 0 -32px; pointer-events:none; border-radius:50%;
+    background:linear-gradient(90deg,transparent,#fff 45%,#f6c9a0 60%,transparent); box-shadow:0 0 12px rgba(255,170,120,.9);
+    animation:slash .45s ease-out forwards}
+  .slash.crit{width:96px; margin-left:-48px; height:7px; background:linear-gradient(90deg,transparent,#fff 40%,#ffd77a 60%,transparent);
+    box-shadow:0 0 18px rgba(255,210,110,1)}
+  @keyframes slash{0%{transform:scaleX(.1); opacity:0} 25%{transform:scaleX(1); opacity:1} 100%{transform:scaleX(1.15); opacity:0}}
+  .critflash{position:absolute; inset:0; z-index:30; pointer-events:none; background:radial-gradient(circle,rgba(255,220,150,.32),rgba(255,120,60,.08) 60%,transparent);
+    animation:critflash .45s ease-out forwards}
+  @keyframes critflash{from{opacity:1} to{opacity:0}}
+  /* combat tracker */
+  .btn.tool.live:not(.on){border-color:#6b3a33; color:#e2a093}
+  .cb-empty{text-align:center; padding:18px 10px 8px; color:var(--text)}
+  .cb-empty .cb-art{width:74px; height:74px; fill:var(--lamp); opacity:.85; filter:drop-shadow(0 4px 10px rgba(0,0,0,.6))}
+  .cb-empty h3{font:600 18px "Iowan Old Style",Georgia,serif; margin:8px 0 4px; color:var(--bone)}
+  .cb-empty p{margin:6px auto 12px; max-width:300px; line-height:1.55}
+  .cb-head{display:flex; align-items:center; gap:8px; margin-bottom:8px}
+  .cb-head>div{flex:1; display:flex; flex-direction:column}
+  .cb-head b{font:600 17px "Iowan Old Style",Georgia,serif; color:var(--bone)}
+  .cb-head span{color:var(--lamp)}
+  .cb-result{cursor:pointer; padding:6px 10px; border-radius:4px; margin-bottom:8px; border:1px solid; font-weight:700}
+  .cb-result.victory{color:#ffd77a; border-color:#7a6230; background:#1f1a10}
+  .cb-result.defeat{color:#e2705a; border-color:#6b3a33; background:#211311}
+  .cb-result u{font-weight:400; margin-left:6px}
+  .cb-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px}
+  .cb-row{display:flex; gap:8px; align-items:flex-start; padding:6px 7px; border:1px solid var(--grid); border-left:3px solid var(--grid);
+    border-radius:4px; background:#12171a; transition:background .2s, border-color .2s}
+  .cb-row.pc{border-left-color:var(--lamp)} .cb-row.ally{border-left-color:var(--kelp)} .cb-row.foe{border-left-color:#a4463c}
+  .cb-row.on{background:#1f1a12; border-color:var(--lamp); box-shadow:0 0 0 1px rgba(217,163,90,.25) inset}
+  .cb-row.down{opacity:.62} .cb-row.dead{opacity:.42}
+  .cb-row.gone{opacity:.5}
+  .cb-por{flex:none; width:34px; height:34px; border-radius:50%; overflow:hidden; background:#0b0e10; border:1.5px solid var(--grid);
+    display:flex; align-items:center; justify-content:center; color:var(--bone); font-weight:700}
+  .cb-por img{width:100%; height:100%; image-rendering:pixelated; object-fit:cover}
+  .cb-por svg{width:78%; height:78%; fill:var(--bone)}
+  .cb-por.big{width:58px; height:58px; border-color:var(--lamp)}
+  .cb-por.sm{width:20px; height:20px; display:inline-flex; vertical-align:middle; margin-right:6px; border-width:1px}
+  .cb-main{flex:1; min-width:0}
+  .cb-l1{display:flex; gap:6px; align-items:baseline; flex-wrap:wrap}
+  .cb-l1 b{color:var(--text); cursor:pointer} .cb-l1 b:hover{color:var(--lamp)}
+  .cb-init,.cb-ac{font-size:10px; color:var(--dim); border:1px solid var(--grid); border-radius:8px; padding:0 6px}
+  .cb-hp{position:relative; height:13px; margin:4px 0 3px; border-radius:3px; background:#0b0e10; overflow:hidden; border:1px solid #262d31}
+  .cb-hp i{position:absolute; left:0; top:0; bottom:0; background:linear-gradient(#93c08a,#5f8a55); transition:width .45s cubic-bezier(.3,.8,.3,1)}
+  .cb-hp i.mid{background:linear-gradient(#d9b06a,#a87d3c)} .cb-hp i.low{background:linear-gradient(#d0705e,#8e3a30)}
+  .cb-hp span{position:relative; display:block; font-size:9.5px; line-height:12px; padding-left:5px; color:#fff; text-shadow:0 1px 2px #000}
+  .cb-conds{display:flex; flex-wrap:wrap; gap:3px}
+  .cb-cond{cursor:pointer; font:10px ui-monospace,monospace; color:var(--bone); background:#20272b; border:1px solid #39424a; border-radius:9px; padding:0 6px}
+  .cb-cond:hover{border-color:var(--hurt); color:#e2705a}
+  .cb-cond.bad{color:#e2705a; border-color:#6b3a33}
+  .cb-q{display:flex; gap:3px; align-items:center}
+  .cb-q .inp{width:42px; padding:4px 5px; text-align:center}
+  .cb-q .btn{padding:3px 8px; font-size:13px; line-height:1}
+  .cb-add{display:flex; gap:4px; flex-wrap:wrap} .cb-add select{flex:1 1 110px} .cb-add input{width:62px}
+  .cb-hint{margin-top:4px; font-size:10.5px}
+  .cb-log{list-style:none; margin:0; padding:0; max-height:200px; overflow-y:auto}
+  .cb-log li{padding:3px 0; border-bottom:1px solid #20262a; color:var(--text)}
+  .cb-log li i{color:var(--dim); font-style:normal; margin-right:6px}
+  /* end-of-fight card */
+  #csum{position:fixed; inset:0; z-index:70; display:flex; align-items:center; justify-content:center; padding:16px;
+    background:rgba(5,7,8,.62); backdrop-filter:blur(2px)}
+  #csum[hidden]{display:none}
+  .cs-card{width:min(440px,100%); max-height:92vh; overflow-y:auto; background:linear-gradient(#1b2125,#14181b); border:1px solid var(--grid);
+    border-radius:8px; padding:18px 18px 14px; box-shadow:0 20px 60px rgba(0,0,0,.7); font:12px ui-monospace,Menlo,monospace; color:var(--text);
+    animation:csin .45s cubic-bezier(.2,.9,.3,1.15)}
+  @keyframes csin{from{transform:translateY(14px) scale(.96); opacity:0}}
+  @media (prefers-reduced-motion:reduce){ .cs-card{animation:none} .slash,.critflash{animation:none; display:none} }
+  .cs-ribbon{font:700 30px "Iowan Old Style",Georgia,serif; text-align:center; letter-spacing:.06em}
+  .cs-card.victory .cs-ribbon{color:#ffd77a; text-shadow:0 0 22px rgba(255,200,90,.45)}
+  .cs-card.defeat .cs-ribbon{color:#e2705a}
+  .cs-sub{text-align:center; color:var(--dim); margin:2px 0 12px}
+  .cs-mvp{display:flex; gap:12px; align-items:center; padding:9px 11px; border:1px solid #4c3f25; border-radius:6px; background:#1f1a10; margin-bottom:10px}
+  .cs-mvp>div:last-child{display:flex; flex-direction:column}
+  .cs-mvp i{font-style:normal; color:var(--lamp); font-size:10px; letter-spacing:.12em; text-transform:uppercase}
+  .cs-mvp b{font:600 17px "Iowan Old Style",Georgia,serif; color:var(--bone)}
+  .cs-tab{width:100%; border-collapse:collapse}
+  .cs-tab th{color:var(--dim); font-weight:400; font-size:10px; text-align:right; padding:3px 4px; border-bottom:1px solid var(--grid)}
+  .cs-tab td{padding:4px; text-align:right; border-bottom:1px solid #20262a}
+  .cs-tab td:first-child{text-align:left; white-space:nowrap}
+  .cs-tab tr.foe td:first-child{color:#e2a093} .cs-tab tr.down td{opacity:.7}
+  .cs-note{color:var(--dim); margin-top:8px}
+  .cs-btns{display:flex; gap:8px; justify-content:center; margin-top:14px}
   #inspector{display:none; width:min(96vw,860px); margin-top:8px; background:var(--panel);
     border:1px solid var(--grid); border-radius:4px; padding:8px 12px;
     font-family:ui-monospace,monospace; font-size:11.5px}
@@ -385,6 +480,7 @@
   <div class="measure" id="measure">drag a token to measure</div>
   <div class="tools">
     <button class="btn tool" id="claudebtn" title="Claude: rules assistant, narrator, map maker">✦ Claude</button>
+    <button class="btn tool" id="combatbtn" title="combat tracker: turns, HP, conditions, the tally">⚔ Combat</button>
     <button class="btn tool" id="dice" title="dice tray">🎲 Dice</button>
     <button class="btn tool" id="buildbtn" title="map builder, asset library, weather">✎ Build</button>
     <button class="btn" id="mapbtn" title="dungeon overview" hidden>🗺</button>
@@ -400,12 +496,14 @@
   <div class="side-head">
     <div class="tabs" role="tablist">
       <button class="tab" data-tab="claude" role="tab">✦ Claude</button>
+      <button class="tab" data-tab="combat" role="tab">⚔ Combat</button>
       <button class="tab" data-tab="dice" role="tab">🎲 Dice</button>
       <button class="tab" data-tab="build" role="tab">✎ Build</button>
     </div>
     <button class="btn" id="sideclose" title="close panel">✕</button>
   </div>
   <section class="pane" id="p-claude" data-pane="claude"></section>
+  <section class="pane" id="p-combat" data-pane="combat"></section>
   <section class="pane" id="p-dice" data-pane="dice">
     <div class="dicecast">
       <input id="dexpr" class="inp" value="d20" spellcheck="false" aria-label="dice to roll" placeholder="d20+7, 2d6+3, 4d6kh3">
@@ -435,6 +533,12 @@
 </aside>
 </div>
 <div id="banner"></div>
+<div id="csum" hidden></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="tk-ui-swords" viewBox="0 0 512 512"><g transform="rotate(45 256 256)"><path d="M256 26l24 44v262h-48V70z"/><path d="M186 332h140v30H186z"/><path d="M241 362h30v78h-30z"/><circle cx="256" cy="458" r="22"/></g><g transform="rotate(-45 256 256)"><path d="M256 26l24 44v262h-48V70z"/><path d="M186 332h140v30H186z"/><path d="M241 362h30v78h-30z"/><circle cx="256" cy="458" r="22"/></g></symbol>
+  <symbol id="tk-c-wounded" viewBox="0 0 512 512"><path d="M256 36S118 222 118 322a138 138 0 0 0 276 0C394 222 256 36 256 36z"/><path fill="#171c20" d="M168 300l176-58 12 36-176 58z"/></symbol>
+  <symbol id="tk-c-unconscious" viewBox="0 0 512 512"><path d="M96 110h200v46L166 322h130v46H96v-46l130-166H96z"/><path d="M300 290h130v34l-82 106h82v34H300v-34l82-106h-82z"/></symbol>
+</svg>
 <script>
 /* ========================= demo scene (replaced by the GM) ========================= */
 const DEFAULT_SCENE = {
@@ -517,7 +621,8 @@ const COND_TITLES={prone:'prone',grabbed:'grabbed',restrained:'restrained',
   blessed:'blessed',fleeing:'fleeing',immobilized:'immobilized',confused:'confused',
   fatigued:'fatigued',sickened:'sickened',quickened:'quickened',enfeebled:'enfeebled',
   drained:'drained',hidden:'hidden',invisible:'invisible',dying:'dying',dead:'dead',
-  delay:'delaying',target:'targeted'};
+  delay:'delaying',target:'targeted',wounded:'wounded',unconscious:'unconscious',doomed:'doomed',
+  clumsy:'clumsy',stupefied:'stupefied',stable:'stable'};
 
 /* ---- scene normalization: cell refs → r/c, hp → {cur,max}, ids assigned ---- */
 function normToken(t){
@@ -534,7 +639,10 @@ function normToken(t){
     ...(TOKEN_FRAMES.includes(t.frame)?{frame:t.frame}:{}),
     ...(Number.isFinite(+t.ac)&&t.ac!==null&&t.ac!==''?{ac:+t.ac}:{}),
     ...(Number.isFinite(+t.init)&&t.init!==null&&t.init!==''?{init:+t.init}:{}),
-    st:t.st||null, conds:(t.conds||[]).map(normCond).slice(0,3),
+    st:t.st||null, conds:[...new Set((t.conds||[]).map(normCond))].slice(0,8),
+    ...(t.cval&&typeof t.cval==='object'?{cval:Object.fromEntries(Object.entries(t.cval).filter(([k,v])=>typeof v==='number'||DICE_VAL_RE.test(String(v))))}:{}),
+    ...(t.cdur&&typeof t.cdur==='object'?{cdur:Object.fromEntries(Object.entries(t.cdur).filter(([k,v])=>Number.isInteger(v)&&v>0))}:{}),
+    ...(t.ds&&Number.isInteger(t.ds.s)&&Number.isInteger(t.ds.f)?{ds:{s:t.ds.s,f:t.ds.f}}:{}),
     aura:t.aura&&t.aura.ft?{ft:t.aura.ft, color:t.aura.color||'blue'}:null,
     hidden:!!t.hidden,
     party:t.party,
@@ -2835,16 +2943,21 @@ function drawScene(t){
   const F=14, nb=(rr,cc,ty)=> rr<0||cc<0||rr>=ROWS||cc>=COLS ? ty : typeGrid[rr][cc];
   for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
     if(typeGrid[r][c]!=='fog') continue;
-    const x=gx(c),y=gy(r);
-    const wob=reduceMotion?0:Math.sin(t*.5+r*1.7+c*2.3)*.05;
-    ctx.fillStyle=`hsla(210,16%,68%,${.40+wob})`; ctx.fillRect(x,y,CELL,CELL);
-    ctx.fillStyle='hsla(210,26%,86%,.12)';
-    ctx.beginPath(); ctx.ellipse(x+CELL*(.3+rnd(r,c,7)*.4), y+CELL*(.3+rnd(r,c,8)*.4),
-      CELL*.44, CELL*.3, rnd(r,c,9)*3, 0, 7); ctx.fill();
+    /* soft drifting puffs that spill past the cell, so a fog bank has no hard edge */
+    const x=gx(c)+CELL/2,y=gy(r)+CELL/2;
+    for(let k=0;k<3;k++){
+      const dr=reduceMotion?0:t*(.05+rnd(r,c,20+k)*.08);
+      const px2=x+Math.cos(rnd(r,c,10+k)*6.3+dr)*CELL*.32, py2=y+Math.sin(rnd(r,c,13+k)*6.3+dr)*CELL*.26;
+      const rad=CELL*(.62+rnd(r,c,16+k)*.3), a=.26+(reduceMotion?0:Math.sin(t*.4+r*1.7+c*2.3+k)*.04);
+      const g=ctx.createRadialGradient(px2,py2,0,px2,py2,rad);
+      g.addColorStop(0,`hsla(210,18%,${74+k*4}%,${a})`); g.addColorStop(.55,`hsla(210,18%,72%,${a*.6})`);
+      g.addColorStop(1,'hsla(210,18%,70%,0)');
+      ctx.fillStyle=g; ctx.fillRect(px2-rad,py2-rad,rad*2,rad*2);
+    }
   }
   for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
-    const ty=typeGrid[r][c]; if(ty!=='fog'&&ty!=='dark') continue;
-    const col=ty==='fog'?'168,178,192':'6,9,11', a=ty==='fog'?.30:.62;
+    const ty=typeGrid[r][c]; if(ty!=='dark') continue;
+    const col='6,9,11', a=.62;
     const x=gx(c),y=gy(r);
     const strip=(sx,sy,sw,sh,x0,y0,x1,y1)=>{
       const g=ctx.createLinearGradient(x0,y0,x1,y1);
@@ -3119,13 +3232,20 @@ function updateToken(tk){
   const st=statusOf(tk);
   el.classList.toggle('hurt', st==='hurt');
   el.classList.toggle('down', st==='down');
+  el.classList.toggle('dying', tk.conds.includes('dying'));
+  el.classList.toggle('dead', tk.conds.includes('dead'));
   el.querySelectorAll('.cond').forEach(n=>n.remove());
-  tk.conds.slice(0,3).forEach((cd,i)=>{
-    const s=document.createElement('span'); s.className='cond';
-    s.style.left=(2+i*33)+'%'; s.title=COND_TITLES[cd]||cd;
-    s.innerHTML=`<svg><use href="#tk-c-${cd}"/></svg>`;
+  const many=tk.conds.length>3, shown=many?tk.conds.slice(0,2):tk.conds;
+  shown.forEach((cd,i)=>{
+    const s=document.createElement('span'); s.className='cond'+(cd==='dying'||cd==='dead'?' bad':'');
+    s.style.left=(2+i*33)+'%'; s.title=condLabel(tk,cd);
+    const v=tk.cval&&tk.cval[cd];
+    s.innerHTML=(document.getElementById('tk-c-'+cd)?`<svg><use href="#tk-c-${cd}"/></svg>`:`<em>${esc((COND_TITLES[cd]||cd).slice(0,2))}</em>`)+
+      (typeof v==='number'&&v>0?`<b>${v}</b>`:'');
     el.appendChild(s);
   });
+  if(many){ const s=document.createElement('span'); s.className='cond more'; s.style.left='68%';
+    s.title=tk.conds.slice(2).map(c=>condLabel(tk,c)).join(', '); s.innerHTML=`<em>+${tk.conds.length-2}</em>`; el.appendChild(s); }
   let bar=el.querySelector('.hp');
   if(tk.hp){
     if(!bar){ bar=document.createElement('span'); bar.className='hp';
@@ -3213,11 +3333,20 @@ $('init').addEventListener('click',e=>{
 });
 function advanceTurn(){
   if(!S.initiative.length) return;
-  S.active++;
-  if(S.active>=S.initiative.length){S.active=0; S.round++;}
+  const tokOf=e=>e&&e.t?S.tokens.find(t=>t.id===e.t):null;
+  const prev=tokOf(S.initiative[S.active]);
+  /* the fallen don't take turns: dead PCs and foes at 0 HP are skipped (the dying still roll) */
+  const out=t=>t&&(t.conds.includes('dead')||(t.kind==='foe'&&statusOf(t)==='down'));
+  for(let n=0;n<S.initiative.length;n++){
+    S.active++;
+    if(S.active>=S.initiative.length){S.active=0; S.round++;}
+    if(!out(tokOf(S.initiative[S.active]))) break;
+  }
   const e=S.initiative[S.active];
   if(e&&e.t&&live.get(e.t)) pulse(live.get(e.t));
+  turnHooks(prev, tokOf(e));
   renderChips();
+  if(typeof renderCombat==='function') renderCombat();
 }
 function pulse(el){ el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
 
@@ -3241,6 +3370,8 @@ let bannerTimer=null;
 function banner(text,tone){
   const b=$('banner');
   b.textContent=text; b.className=(tone||'')+' show';
+  const vr=$('viewport').getBoundingClientRect();
+  b.style.top=clamp(Math.round(vr.top+12),12,Math.max(12,innerHeight-90))+'px';
   clearTimeout(bannerTimer);
   bannerTimer=setTimeout(()=>b.classList.remove('show'), 3500+Math.min(5000,text.length*55));
 }
@@ -3248,14 +3379,19 @@ $('banner').addEventListener('click',()=>$('banner').classList.remove('show'));
 
 /* =============================== GM commands =============================== */
 function hpDelta(tk,n){
+  const was=tk.hp?tk.hp.cur:null;
   if(!tk.hp) tk.hp={cur:Math.max(0,n), max:Math.max(1,n)};
   else tk.hp.cur=clamp(tk.hp.cur+n, 0, tk.hp.max);
   tk.st=null;
   const el=live.get(tk.id);
   if(el&&n) floater(tk,(n>0?'+':'')+n, n>0?'heal':'dmg');
+  if(n<0&&was!==null) tallyHit(tk, was-tk.hp.cur, was>0&&tk.hp.cur===0);
+  const extra=deathRules(tk,was,n);
   updateToken(tk); renderChips();
+  if(n<0) queueVictory();
+  if(typeof renderCombat==='function') renderCombat();
   const st=statusOf(tk);
-  return `${tk.name} ${n>0?'+':''}${n} → ${tk.hp.cur}/${tk.hp.max}${st!=='fresh'?' ('+st+')':''}`;
+  return `${tk.name} ${n>0?'+':''}${n} → ${tk.hp.cur}/${tk.hp.max}${st!=='fresh'?' ('+st+')':''}${extra}`;
 }
 function moveTok(tk,to,instant){
   const p=parseRef(to);
@@ -3299,15 +3435,15 @@ function applyCmd(cmd){
     updateToken(tk); renderChips(); return `${tk.name} is ${st}`; }
   case 'cond': {
     const tk=findTok(cmd.t);
-    if(cmd.remove==='all') tk.conds=[];
-    else if(cmd.remove) for(const c of [].concat(cmd.remove))
-      tk.conds=tk.conds.filter(x=>x!==normCond(c));
+    if(cmd.remove==='all'){ tk.conds=[]; delete tk.cval; delete tk.cdur; delete tk.ds; }
+    else if(cmd.remove) for(const c of [].concat(cmd.remove)) removeCond(tk, parseCondSpec(c).name);
+    const pick=(o,k)=>o!==undefined&&o!==null&&typeof o==='object'?o[k]:o;
     if(cmd.add) for(const c of [].concat(cmd.add)){
-      const n=normCond(c);
-      if(!tk.conds.includes(n)&&tk.conds.length<3) tk.conds.push(n);
+      const sp=parseCondSpec(c);
+      addCond(tk, sp.name, sp.v??condValue(pick(cmd.value,sp.name)), sp.rounds??pick(cmd.rounds,sp.name));
     }
-    updateToken(tk);
-    return `${tk.name}: ${tk.conds.join(', ')||'no conditions'}`; }
+    updateToken(tk); if(typeof renderCombat==='function') renderCombat();
+    return `${tk.name}: ${condList(tk)||'no conditions'}`; }
   case 'spawn': {
     const tk=normToken(cmd.token||cmd);
     if(S.tokens.some(t=>t.id===tk.id)) throw `id "${tk.id}" already on the board`;
@@ -3507,8 +3643,10 @@ function applyBatch(input){
     try{
       const msg=applyCmd(cmd); ok++;
       logLine((cmd.do==='say'?'':'✓ ')+msg, cmd.do==='say'?'say':'');
+      if(/^(attack|strike|save|check|damage|heal|cond)$/.test(cmd.do)) clog(msg.replace(/^🎲 /,''));
     }catch(err){ logLine('✗ '+(typeof err==='string'?err:err.message), 'err'); }
   }
+  checkVictory();
   save();
   return ok;
 }
@@ -3547,9 +3685,8 @@ $('inspector').addEventListener('click',e=>{
   if(b.dataset.a==='cycle') cycleToken(tk);
   if(b.dataset.a==='cond'){
     const c=b.dataset.c;
-    if(tk.conds.includes(c)) tk.conds=tk.conds.filter(x=>x!==c);
-    else if(tk.conds.length<3) tk.conds.push(c);
-    updateToken(tk);
+    if(tk.conds.includes(c)) removeCond(tk,c); else addCond(tk,c);
+    updateToken(tk); renderCombat();
   }
   renderInspector(); save();
 });
@@ -3880,10 +4017,12 @@ function stateForGM(){
       exits:ex.map(e=>({to:e.to, kind:e.kind, ...(e.label?{label:e.label}:{}),
         ...(e.ready?{partyIsHere:true}:{})}))}:{}),
     turn:S.initiative[S.active]?.name||null,
+    ...(S.combat&&S.combat.result?{combatResult:S.combat.result}:{}),
     tokens:S.tokens.map(tk=>({id:tk.id, name:tk.name, at:refOf(tk.r,tk.c),
       ...(tk.hp?{hp:tk.hp.cur+'/'+tk.hp.max}:{}),
       status:statusOf(tk),
-      ...(tk.conds.length?{conds:tk.conds}:{}),
+      ...(tk.conds.length?{conds:tk.conds.map(c=>condLabel(tk,c))}:{}),
+      ...(tk.ac!==undefined?{ac:tk.ac}:{}),
       ...(tk.hidden?{hidden:true}:{}),
       ...(tk.aura?{aura:tk.aura.ft+' ft'}:{}),
       ...(visGrid&&!tokenSeen(tk)?{unseen:true}:{})})),
@@ -4036,7 +4175,7 @@ function renderDiceTray(latest){
       (e.degree!==null?`<br><span class="deg ${DEG_CLASS[e.degree]}">${e.degreeName}</span> vs DC ${e.dc}`:'')+`</div>`;
   }
   hist.innerHTML=ROLL_LOG.slice(0,30).map(r=>`<li><span class="n">${r.total}</span><span class="w">${esc(r.label||r.spec)}`+
-    `${r.by!=='table'?' · '+esc(r.by):''}</span>${r.degree!==null?`<span class="deg ${DEG_CLASS[r.degree]}">${r.degreeName}</span>`:''}</li>`).join('');
+    `${r.by!=='table'&&!r.label.toLowerCase().startsWith(String(r.by).toLowerCase())?' · '+esc(r.by):''}</span>${r.degree!==null?`<span class="deg ${DEG_CLASS[r.degree]}">${r.degreeName}</span>`:''}</li>`).join('');
 }
 function trayRoll(spec){
   try{ rollDice(spec||$('dexpr').value||'d20', $('dlabel').value.trim(), false,
@@ -4081,6 +4220,9 @@ function cmdSave(cmd){
   const tk=findTok(cmd.t), rs=rules();
   const r=d20Test(cmd.mod??cmd.bonus, cmd.dc, cmd.label||(tk.name+' save'), tk.name);
   let out='🎲 '+r.txt;
+  const src=cmd.by||cmd.from||cmd.source;
+  try{ HP_CTX={by:src?findTok(src).id:null, crit:r.degree===0&&rs==='pf2e'}; }catch(e){ HP_CTX=null; }
+  try{
   if(cmd.damage){
     const full=rollTerms(parseDice(cmd.damage)).total;
     let dmg;
@@ -4089,9 +4231,10 @@ function cmdSave(cmd){
     if(dmg>0) out+=' · '+hpDelta(tk,-dmg); else { floater(tk,'no damage','info'); out+=' · no damage'; }
   }
   if(cmd.cond&&r.degree!==null&&r.degree<=1){
-    for(const c of [].concat(cmd.cond)){ const n=normCond(c); if(!tk.conds.includes(n)&&tk.conds.length<3) tk.conds.push(n); }
-    updateToken(tk); out+=` · ${tk.name} is ${[].concat(cmd.cond).join(', ')}`;
+    for(const c of [].concat(cmd.cond)){ const sp=parseCondSpec(c); addCond(tk, sp.name, sp.v, sp.rounds); }
+    updateToken(tk); out+=` · ${tk.name} is ${[].concat(cmd.cond).map(c=>typeof c==='object'?c.name:c).join(', ')}`;
   }
+  } finally { HP_CTX=null; }
   return out;
 }
 function cmdAttack(cmd){
@@ -4103,22 +4246,27 @@ function cmdAttack(cmd){
   const r=d20Test(bonus, +ac, (cmd.label||atk.name+' → '+tgt.name), atk.name, true);
   const hit=r.degree>=2, crit=r.degree===3;
   let out=`🎲 ${r.txt}`;
+  if(combatOn()){ const a=cstat(atk.id); if(hit) a.hits++; else a.misses++; if(crit) a.crits++; }
+  strikeFX(atk,tgt,hit,crit);
   if(hit&&cmd.damage){
     const dmg=rollDamage(cmd.damage, crit, rs);
     if(crit) floater(tgt,'CRIT!','info');
-    out+=' · '+hpDelta(tgt,-dmg)+(crit?' (critical)':'');
+    HP_CTX={by:atk.id, crit};
+    try{ out+=' · '+hpDelta(tgt,-dmg)+(crit?' (critical)':''); } finally { HP_CTX=null; }
   } else if(!hit){ floater(tgt,'miss','info'); out+=' · miss'; }
   return out;
 }
 function cmdCombat(cmd){
-  if(cmd.end||cmd.stop){ S.initiative=[]; S.active=0; renderChips(); banner('Combat ends.','success'); return 'combat over'; }
+  if(cmd.end||cmd.stop){ S.initiative=[]; S.active=0; if(S.combat) S.combat.on=false;
+    renderChips(); renderCombat(); banner('Combat ends.','success'); return 'combat over'; }
   const who=(cmd.only?[].concat(cmd.only).map(findTok):S.tokens.filter(t=>!t.hidden&&t.kind!=='mark'&&statusOf(t)!=='down'));
   const rolled=who.map(tk=>{
     const mod=+(tk.init??0), d=1+Math.floor(Math.random()*20);
     return {tk, total:d+mod, d};
   }).sort((a,b)=>b.total-a.total || (a.tk.kind==='foe')-(b.tk.kind==='foe'));
   S.initiative=rolled.map(x=>({name:`${x.tk.name} ${x.total}`, detail:'', kind:x.tk.kind, t:x.tk.id}));
-  S.active=0; S.round=1; renderChips();
+  S.active=0; S.round=1; S.combat={on:true, stats:{}, result:null, log:[], round0:1};
+  renderChips(); if($('side').hidden&&innerWidth>1240) openSide('combat',true); else renderCombat();
   const first=S.initiative[0]; if(first&&live.get(first.t)) pulse(live.get(first.t));
   banner('Roll for initiative! '+(first?first.name.replace(/ \d+$/,'')+' goes first.':''),'danger');
   for(const x of rolled) ROLL_LOG.unshift({label:x.tk.name+' initiative', spec:'d20'+((x.tk.init??0)>=0?'+':'')+(x.tk.init??0),
@@ -4126,6 +4274,340 @@ function cmdCombat(cmd){
   renderDiceTray();
   return 'initiative: '+S.initiative.map(e=>e.name).join(' · ');
 }
+
+
+/* =============================== combat engine ===============================
+   The board keeps the fight honest: turn hooks (frightened ticks down, timed
+   conditions run out, persistent damage burns and gets a flat check to end),
+   dying and recovery checks (PF2e) or death saves (5e), a damage tally, and a
+   victory check when the last foe falls. Everything goes through hpDelta and
+   advanceTurn, so a human GM, the rules assistant and the Narrator all get it. */
+const VALUED=new Set(['frightened','sickened','enfeebled','drained','slowed','stunned','dying','wounded',
+  'doomed','clumsy','stupefied','burning','bleeding','poisoned']);
+const PERSISTENT={burning:'fire', bleeding:'bleed', poisoned:'poison'};
+const DICE_VAL_RE=/^\d{0,2}d\d{1,3}([+-]\d{1,3})?$/i;
+let HP_CTX=null;          // {by, crit} while an attack or save resolves, for the tally
+const isPartyTok=tk=>tk.kind==='pc'||tk.kind==='ally';
+const cvalOf=(tk,c)=>{ const v=tk.cval&&tk.cval[c]; return typeof v==='number'?v:0; };
+function condValue(v){
+  if(v===undefined||v===null||v==='') return null;
+  if(typeof v==='number'&&Number.isFinite(v)) return clamp(Math.round(v),0,99);
+  const s=String(v).trim();
+  if(/^\d{1,2}$/.test(s)) return +s;
+  if(DICE_VAL_RE.test(s)) return s.toLowerCase();
+  throw `"${v}" is not a condition value (a number, or dice like 1d6 for persistent damage)`;
+}
+/* "frightened 2", "burning 1d6", "slowed 1 for 2 rounds", {name,value,rounds} */
+function parseCondSpec(c){
+  if(c&&typeof c==='object') return {name:normCond(c.name||c.id||c.cond||''), v:condValue(c.value??c.v), rounds:c.rounds??c.for??null};
+  const m=String(c).trim().match(/^(c-)?([a-z-]+)(?:\s+(\d{1,2}d\d{1,3}(?:[+-]\d+)?|\d{1,2}))?(?:\s*(?:for)?\s*(\d{1,3})\s*(?:r|rd|rds|rounds?))?$/i);
+  if(!m) return {name:normCond(c), v:null, rounds:null};
+  return {name:m[2].toLowerCase().replace(/-/g,''), v:m[3]?condValue(m[3]):null, rounds:m[4]?+m[4]:null};
+}
+function addCond(tk,name,value,rounds){
+  if(!name) return;
+  if(!tk.conds.includes(name)){ if(tk.conds.length>=8) return; tk.conds.push(name); }
+  if(value!==undefined&&value!==null){ tk.cval=tk.cval||{}; tk.cval[name]=value; }
+  if(rounds!==undefined&&rounds!==null&&+rounds>0){ tk.cdur=tk.cdur||{}; tk.cdur[name]=clamp(Math.round(+rounds),1,100); }
+}
+function removeCond(tk,name){
+  tk.conds=tk.conds.filter(x=>x!==name);
+  if(tk.cval) delete tk.cval[name];
+  if(tk.cdur) delete tk.cdur[name];
+}
+function condLabel(tk,c){
+  const v=tk.cval&&tk.cval[c], d=tk.cdur&&tk.cdur[c];
+  let s=COND_TITLES[c]||c;
+  if(v!==undefined&&v!==null) s+=' '+v;
+  if(c==='dying'&&tk.ds) s+=` (${tk.ds.s}✓ ${tk.ds.f}✗)`;
+  if(d) s+=` (${d} rd${d>1?'s':''})`;
+  return s;
+}
+const condList=tk=>tk.conds.map(c=>condLabel(tk,c)).join(', ');
+
+/* ---- combat bookkeeping ---- */
+function combatOn(){
+  if(!S.initiative.length) return false;
+  if(!S.combat&&S.initiative.some(e=>e.t)) S.combat={on:true, stats:{}, result:null, log:[], round0:S.round};
+  return !!(S.combat&&S.combat.on);
+}
+function cstat(id){ const st=S.combat.stats; return st[id]||(st[id]={dealt:0,taken:0,hits:0,misses:0,crits:0,downs:0}); }
+function clog(text){ if(combatOn()){ S.combat.log.unshift({r:S.round, text}); if(S.combat.log.length>60) S.combat.log.pop(); } }
+function tallyHit(tk,lost,dropped){
+  if(!lost||!combatOn()) return;
+  cstat(tk.id).taken+=lost;
+  if(HP_CTX&&HP_CTX.by&&HP_CTX.by!==tk.id){ const a=cstat(HP_CTX.by); a.dealt+=lost; if(dropped) a.downs++; }
+}
+
+/* ---- dying, wounded, death saves ---- */
+function kill(tk){
+  for(const c of ['dying','unconscious','stable']) removeCond(tk,c);
+  delete tk.ds; addCond(tk,'dead');
+  floater(tk,'slain','dmg'); updateToken(tk);
+  return ` · ${tk.name} dies`;
+}
+function setDying(tk,d){
+  const limit=4-cvalOf(tk,'doomed');
+  if(d>=limit) return kill(tk);
+  addCond(tk,'dying',d); updateToken(tk);
+  return ` · dying ${d}`;
+}
+function deathRules(tk,was,n){
+  if(!tk.hp||was===null||!isPartyTok(tk)||tk.conds.includes('dead')) return '';
+  const rs=rules(), crit=!!(HP_CTX&&HP_CTX.crit);
+  if(n<0&&was>0&&tk.hp.cur===0){
+    addCond(tk,'unconscious');
+    if(rs==='5e'){ tk.ds={s:0,f:0}; addCond(tk,'dying'); updateToken(tk); return ' · unconscious, making death saves'; }
+    return ' · unconscious'+setDying(tk,(crit?2:1)+cvalOf(tk,'wounded'));
+  }
+  if(n<0&&was===0&&tk.conds.includes('dying')){
+    if(rs==='5e'){ tk.ds=tk.ds||{s:0,f:0}; tk.ds.f+=crit?2:1;
+      if(tk.ds.f>=3) return kill(tk);
+      updateToken(tk); return ` · ${crit?'two failed death saves':'a failed death save'} (${tk.ds.f}/3)`; }
+    return setDying(tk,cvalOf(tk,'dying')+(crit?2:1));
+  }
+  if(n<0&&was===0&&tk.conds.includes('unconscious')&&!tk.conds.includes('dying')){   // stable, hit again
+    if(rs==='5e'){ tk.ds={s:0,f:crit?2:1}; addCond(tk,'dying'); updateToken(tk); return ' · dying again'; }
+    return setDying(tk,(crit?2:1)+cvalOf(tk,'wounded'));
+  }
+  if(n>0&&was===0&&tk.hp.cur>0){
+    const wasDying=tk.conds.includes('dying');
+    for(const c of ['dying','unconscious','stable']) removeCond(tk,c);
+    delete tk.ds;
+    let s=' · back on their feet';
+    if(rs==='pf2e'&&wasDying){ addCond(tk,'wounded',cvalOf(tk,'wounded')+1); s+=`, wounded ${cvalOf(tk,'wounded')}`; }
+    updateToken(tk); return s;
+  }
+  return '';
+}
+function recoveryCheck(tk){
+  if(rules()==='5e'){
+    tk.ds=tk.ds||{s:0,f:0};
+    const r=rollDice('d20', tk.name+' death save', true, {by:'death save'});
+    let out;
+    if(r.nat===20){ tk.hp.cur=1; for(const c of ['dying','unconscious']) removeCond(tk,c); delete tk.ds;
+      floater(tk,'+1','heal'); out=`${tk.name} rolls a natural 20 on the death save and is back up with 1 HP`; }
+    else{
+      if(r.nat===1) tk.ds.f+=2; else if(r.total>=10) tk.ds.s++; else tk.ds.f++;
+      out=`${tk.name} death save: ${r.total} → ${r.total>=10?'success':'failure'} (${tk.ds.s}✓ ${tk.ds.f}✗)`;
+      if(tk.ds.f>=3) out+=kill(tk);
+      else if(tk.ds.s>=3){ removeCond(tk,'dying'); delete tk.ds; out+=` · ${tk.name} is stable`; }
+    }
+    updateToken(tk); renderChips(); return out;
+  }
+  const d=cvalOf(tk,'dying'), dc=10+d;
+  const r=rollDice('d20', tk.name+' recovery check', true, {dc, by:'recovery'});
+  const nd=d+[2,1,-1,-2][r.degree];
+  let out=`${tk.name} recovery check: ${r.total} vs DC ${dc} → ${r.degreeName}`;
+  if(nd<=0){ removeCond(tk,'dying'); addCond(tk,'wounded',cvalOf(tk,'wounded')+1); out+=` · stable at 0 HP, wounded ${cvalOf(tk,'wounded')}`; floater(tk,'stable','heal'); }
+  else out+=setDying(tk,nd);
+  updateToken(tk); return out;
+}
+function endOfTurn(tk){
+  const out=[];
+  for(const [c,kind] of Object.entries(PERSISTENT)){
+    if(!tk.conds.includes(c)) continue;
+    const v=tk.cval&&tk.cval[c];
+    if(v===undefined||v===null||!tk.hp) continue;
+    const dmg=typeof v==='number'?v:rollTerms(parseDice(v)).total;
+    const m=hpDelta(tk,-dmg);
+    out.push(`${tk.name} takes ${dmg} persistent ${kind} →`+(m.split('→')[1]||''));
+    if(rules()==='pf2e'&&!tk.conds.includes('dead')){
+      const f=rollDice('d20', `${tk.name} flat check to end ${c}`, true, {dc:15, by:'flat check'});
+      if(f.degree>=2){ removeCond(tk,c); out.push(`${tk.name} is no longer ${COND_TITLES[c]||c} (flat check ${f.total})`); }
+    }
+  }
+  if(tk.conds.includes('frightened')&&rules()==='pf2e'){
+    const v=cvalOf(tk,'frightened')||1;
+    if(v<=1){ removeCond(tk,'frightened'); out.push(`${tk.name} is no longer frightened`); }
+    else{ tk.cval.frightened=v-1; out.push(`${tk.name} is frightened ${v-1}`); }
+  }
+  if(tk.cdur) for(const c of Object.keys(tk.cdur)){
+    if(!tk.conds.includes(c)){ delete tk.cdur[c]; continue; }
+    tk.cdur[c]--;
+    if(tk.cdur[c]<=0){ removeCond(tk,c); out.push(`${tk.name}'s ${COND_TITLES[c]||c} wears off`); }
+  }
+  updateToken(tk);
+  return out;
+}
+function startOfTurn(tk){
+  if(tk.hp&&tk.hp.cur<=0&&tk.conds.includes('dying')&&!tk.conds.includes('dead')) return [recoveryCheck(tk)];
+  return [];
+}
+function turnHooks(prev,next){
+  const lines=[];
+  if(prev) lines.push(...endOfTurn(prev));
+  if(next) lines.push(...startOfTurn(next));
+  for(const l of lines){ logLine('⏱ '+l); clog(l); }
+  return lines;
+}
+let victoryQ=false;
+function queueVictory(){ if(victoryQ) return; victoryQ=true; setTimeout(checkVictory,0); }
+function combatSides(){
+  const inInit=new Set(S.initiative.map(e=>e.t).filter(Boolean));
+  const inFight=t=>!t.hidden&&t.kind!=='mark'&&(inInit.size?inInit.has(t.id):true);
+  return {foes:S.tokens.filter(t=>inFight(t)&&t.kind==='foe'), party:S.tokens.filter(t=>inFight(t)&&isPartyTok(t))};
+}
+function checkVictory(){
+  victoryQ=false;
+  if(!combatOn()||S.combat.result) return;
+  const {foes,party}=combatSides(), down=t=>statusOf(t)==='down';
+  const res=foes.length&&foes.every(down)?'victory':party.length&&party.every(down)?'defeat':null;
+  if(!res) return;
+  S.combat.result=res; S.combat.endRound=S.round;
+  clog(res==='victory'?'Victory':'The party falls');
+  banner(res==='victory'?`Victory! The last foe falls in round ${S.round}.`:'The party falls…', res==='victory'?'success':'danger');
+  renderCombat(); showSummary(); save();
+}
+
+/* ---- the strike, animated ---- */
+function strikeFX(atk,tgt,hit,crit){
+  if(reduceMotion) return;
+  const a=live.get(atk.id), b=live.get(tgt.id); if(!a||!b||atk===tgt) return;
+  const ax=(atk.c+atk.size/2)*CELL, ay=(atk.r+atk.size/2)*CELL, bx=(tgt.c+tgt.size/2)*CELL, by=(tgt.r+tgt.size/2)*CELL;
+  const dx=bx-ax, dy=by-ay, d=Math.hypot(dx,dy)||1, ranged=d>CELL*1.9;
+  let delay=0;
+  if(ranged){
+    const p=document.createElement('div'); p.className='bolt';
+    p.style.left=MARGIN+ax+'px'; p.style.top=MARGIN+ay+'px';
+    p.style.rotate=Math.atan2(dy,dx)+'rad';
+    $('stage').appendChild(p);
+    delay=clamp(d/CELL*45,160,420);
+    p.animate([{translate:'0 0',opacity:1},{translate:`${dx}px ${dy}px`,opacity:1}],{duration:delay,easing:'cubic-bezier(.3,.1,.7,1)'})
+      .onfinish=()=>p.remove();
+    a.animate([{scale:'1'},{scale:'1.08'},{scale:'1'}],{duration:220});
+  } else {
+    const L=Math.min(d*.38,CELL*.5);
+    a.animate([{translate:'0 0'},{translate:`${dx/d*L}px ${dy/d*L}px`,offset:.35},{translate:'0 0'}],{duration:340,easing:'ease-out'});
+    delay=120;
+  }
+  setTimeout(()=>{
+    if(hit){
+      const s=document.createElement('div'); s.className='slash'+(crit?' crit':'');
+      s.style.left=MARGIN+bx+'px'; s.style.top=MARGIN+by+'px'; s.style.rotate=(Math.atan2(dy,dx)+.9)+'rad';
+      $('stage').appendChild(s); setTimeout(()=>s.remove(),520);
+      b.animate([{translate:'0 0'},{translate:`${dx/d*5}px ${dy/d*5}px`},{translate:'0 0'}],{duration:200});
+      if(crit){
+        $('viewport').animate([{translate:'0 0'},{translate:'-5px 3px'},{translate:'4px -3px'},{translate:'-3px -2px'},{translate:'0 0'}],{duration:320});
+        const f=document.createElement('div'); f.className='critflash'; $('viewport').appendChild(f); setTimeout(()=>f.remove(),450);
+      }
+    } else b.animate([{translate:'0 0'},{translate:`${-dy/d*7}px ${dx/d*7}px`},{translate:'0 0'}],{duration:260,easing:'ease-out'});
+  }, delay);
+}
+
+/* ---- the tracker panel ---- */
+const CB_CONDS=['frightened','sickened','slowed','stunned','enfeebled','drained','clumsy','stupefied','doomed','prone','grabbed',
+  'restrained','immobilized','blinded','offguard','burning','bleeding','poisoned','fatigued','confused','fleeing','quickened',
+  'hidden','invisible','blessed','wounded','dying','unconscious'];
+function portraitHTML(tk){
+  if(tk.art&&pixelArtURL(tk.art)) return `<img alt="" src="${pixelArtURL(tk.art)}">`;
+  if(tk.icon) return `<svg><use href="#tk-${esc(tk.icon)}"/></svg>`;
+  return `<span>${esc(tk.label||tk.name[0])}</span>`;
+}
+function renderCombat(){
+  const btn=$('combatbtn');
+  if(btn) btn.classList.toggle('live', !!S.initiative.length);
+  const p=$('p-combat'); if(!p||SIDE_TAB!=='combat') return;
+  if(!S.initiative.length){
+    const n=S.tokens.filter(t=>!t.hidden&&t.kind!=='mark').length;
+    p.innerHTML=`<div class="cb-empty"><svg class="cb-art"><use href="#tk-ui-swords"/></svg>
+      <h3>No fight yet</h3>
+      <p>${n?`Roll initiative for the ${n} token${n>1?'s':''} on the board. The tracker then runs the turns, hit points, conditions that wear off, dying and the victory tally.`
+        :'Put some tokens on the board first: load a quick map from Build, or drop portraits with the token brush.'}</p>
+      ${n?'<button class="btn primary" data-cb="start">⚔ Roll initiative</button>':'<button class="btn" data-cb="build">✎ Open the builder</button>'}
+      <p class="dim">Tokens roll d20 plus their init bonus. AC on a token lets attacks resolve by themselves.</p></div>`;
+    return;
+  }
+  const act=S.initiative[S.active], atk=act&&act.t&&S.tokens.find(t=>t.id===act.t);
+  const res=S.combat&&S.combat.result;
+  let h=`<div class="cb-head"><div><b>Round ${S.round}</b><span>${act?esc(act.name.replace(/ \d+$/,''))+"'s turn":''}</span></div>
+    <button class="btn primary" data-cb="next" title="end this turn (runs end-of-turn effects)">Next turn ▸</button>
+    <button class="btn" data-cb="end" title="clear initiative">End</button></div>`;
+  if(res) h+=`<div class="cb-result ${res}" data-cb="summary">${res==='victory'?'★ Victory':'✝ The party falls'} · round ${S.combat.endRound} <u>see the tally</u></div>`;
+  h+='<ol class="cb-list">';
+  S.initiative.forEach((e,i)=>{
+    const tk=e.t&&S.tokens.find(t=>t.id===e.t);
+    const tot=(e.name.match(/ (\d+)$/)||[])[1];
+    if(!tk){ h+=`<li class="cb-row gone${i===S.active?' on':''}"><div class="cb-por"><span>?</span></div><div class="cb-main"><b>${esc(e.name)}</b><i class="dim">${esc(e.detail||'')}</i></div></li>`; return; }
+    const st=statusOf(tk), f=tk.hp?clamp(tk.hp.cur/tk.hp.max,0,1):null;
+    h+=`<li class="cb-row ${tk.kind}${i===S.active?' on':''}${st==='down'?' down':''}${tk.conds.includes('dead')?' dead':''}" data-id="${esc(tk.id)}">
+      <div class="cb-por">${portraitHTML(tk)}</div>
+      <div class="cb-main"><div class="cb-l1"><b data-cb="sel">${esc(tk.name)}</b>${tot?`<span class="cb-init" title="initiative">${tot}</span>`:''}${tk.ac!==undefined?`<span class="cb-ac" title="armor class">AC ${tk.ac}</span>`:''}</div>
+        ${tk.hp?`<div class="cb-hp" title="${tk.hp.cur}/${tk.hp.max} HP"><i style="width:${f*100}%" class="${f<=.25?'low':f<=.5?'mid':''}"></i><span>${tk.hp.cur}/${tk.hp.max}</span></div>`:`<div class="dim">${st}</div>`}
+        <div class="cb-conds">${tk.conds.map(c=>`<button class="cb-cond${c==='dying'||c==='dead'?' bad':''}" data-cb="uncond" data-c="${c}" title="remove ${esc(COND_TITLES[c]||c)}">${esc(condLabel(tk,c))} ×</button>`).join('')}</div></div>
+      ${tk.hp?`<div class="cb-q"><input class="inp" inputmode="numeric" maxlength="4" aria-label="amount for ${esc(tk.name)}" placeholder="hp"><button class="btn" data-cb="dmg" title="damage">−</button><button class="btn" data-cb="heal" title="heal">+</button></div>`:''}
+    </li>`;
+  });
+  h+='</ol>';
+  const opts=S.tokens.filter(t=>!t.hidden&&t.kind!=='mark').map(t=>`<option value="${esc(t.id)}"${atk&&t.id===atk.id?' selected':''}>${esc(t.name)}</option>`).join('');
+  h+=`<div class="h3">add a condition</div><div class="cb-add"><select class="inp" id="cbtok" aria-label="token">${opts}</select>
+    <select class="inp" id="cbcond" aria-label="condition">${CB_CONDS.map(c=>`<option value="${c}">${esc(COND_TITLES[c]||c)}</option>`).join('')}</select>
+    <input class="inp" id="cbval" placeholder="value" aria-label="value (or persistent damage dice)" size="4">
+    <input class="inp" id="cbrd" inputmode="numeric" placeholder="rounds" aria-label="rounds it lasts" size="4">
+    <button class="btn" data-cb="addcond">Add</button></div>
+    <div class="dim cb-hint">Value is the number (frightened 2) or persistent damage dice (burning 1d6). Rounds counts down at the end of that token's turn.</div>`;
+  const lg=(S.combat&&S.combat.log)||[];
+  h+=`<div class="h3">this fight</div>`+(lg.length?`<ul class="cb-log">${lg.slice(0,40).map(x=>`<li><i>R${x.r}</i>${esc(x.text)}</li>`).join('')}</ul>`:'<div class="dim">Attacks, saves and turn effects land here.</div>');
+  p.innerHTML=h;
+}
+$('p-combat').addEventListener('click',e=>{
+  const b=e.target.closest('[data-cb]'); if(!b) return;
+  const a=b.dataset.cb, row=b.closest('.cb-row'), id=row&&row.dataset.id;
+  if(a==='start') applyBatch([{do:'combat'}]);
+  else if(a==='build') openSide('build',true);
+  else if(a==='next') applyBatch([{do:'next'}]);
+  else if(a==='end') applyBatch([{do:'combat',end:true}]);
+  else if(a==='summary') showSummary();
+  else if(a==='sel'&&id){ const el=live.get(id); if(el) pulse(el); selectTok(id); }
+  else if((a==='dmg'||a==='heal')&&id){
+    const n=Math.abs(parseInt(row.querySelector('.cb-q input').value,10));
+    if(!n){ row.querySelector('.cb-q input').focus(); return; }
+    applyBatch([{do:a==='dmg'?'damage':'heal', t:id, n}]);
+  }
+  else if(a==='uncond'&&id) applyBatch([{do:'cond', t:id, remove:[b.dataset.c]}]);
+  else if(a==='addcond'){
+    const v=$('cbval').value.trim(), rd=$('cbrd').value.trim();
+    applyBatch([{do:'cond', t:$('cbtok').value, add:[{name:$('cbcond').value, ...(v?{value:v}:{}), ...(rd?{rounds:+rd}:{})}]}]);
+  }
+  renderCombat();
+});
+$('p-combat').addEventListener('keydown',e=>{
+  if(e.key!=='Enter') return;
+  const inp=e.target.closest('.cb-q input'); if(!inp) return;
+  inp.parentElement.querySelector('[data-cb="dmg"]').click();
+});
+$('combatbtn').addEventListener('click',()=>openSide('combat'));
+
+/* ---- the end-of-fight card ---- */
+function showSummary(){
+  if(!S.combat||!S.combat.result) return;
+  const res=S.combat.result, st=S.combat.stats;
+  const rounds=Math.max(1,(S.combat.endRound||S.round)-(S.combat.round0||1)+1);
+  const rows=[...S.tokens].filter(t=>st[t.id]||S.initiative.some(e=>e.t===t.id))
+    .sort((a,b)=>isPartyTok(b)-isPartyTok(a)||(st[b.id]?.dealt||0)-(st[a.id]?.dealt||0));
+  const party=rows.filter(isPartyTok), mvp=party.slice().sort((a,b)=>(st[b.id]?.dealt||0)-(st[a.id]?.dealt||0))[0];
+  const tank=party.slice().sort((a,b)=>(st[b.id]?.taken||0)-(st[a.id]?.taken||0))[0];
+  const crits=rows.reduce((n,t)=>n+(st[t.id]?.crits||0),0);
+  const box=$('csum');
+  box.innerHTML=`<div class="cs-card ${res}" role="dialog" aria-label="combat summary">
+    <div class="cs-ribbon">${res==='victory'?'Victory':'Defeat'}</div>
+    <div class="cs-sub">${esc(S.header)} · ${rounds} round${rounds>1?'s':''}${crits?` · ${crits} critical hit${crits>1?'s':''}`:''}</div>
+    ${mvp&&st[mvp.id]?.dealt?`<div class="cs-mvp"><div class="cb-por big">${portraitHTML(mvp)}</div><div><i>${res==='victory'?'Hero of the fight':'Fought hardest'}</i><b>${esc(mvp.name)}</b><span>${st[mvp.id].dealt} damage${st[mvp.id].downs?`, ${st[mvp.id].downs} foe${st[mvp.id].downs>1?'s':''} dropped`:''}</span></div></div>`:''}
+    <table class="cs-tab"><thead><tr><th></th><th>dealt</th><th>taken</th><th>hits</th><th>crits</th></tr></thead><tbody>
+    ${rows.map(t=>{ const s=st[t.id]||{dealt:0,taken:0,hits:0,misses:0,crits:0};
+      return `<tr class="${t.kind}${statusOf(t)==='down'?' down':''}"><td><span class="cb-por sm">${portraitHTML(t)}</span>${esc(t.name)}</td><td>${s.dealt}</td><td>${s.taken}</td><td>${s.hits}/${s.hits+s.misses}</td><td>${s.crits||''}</td></tr>`; }).join('')}
+    </tbody></table>
+    ${tank&&st[tank.id]?.taken&&tank!==mvp?`<div class="cs-note">${esc(tank.name)} took the most punishment: ${st[tank.id].taken} damage.</div>`:''}
+    <div class="cs-btns"><button class="btn primary" data-cs="end">End combat</button><button class="btn" data-cs="close">Keep playing</button></div></div>`;
+  box.hidden=false;
+  box.querySelector('[data-cs="end"]').focus();
+}
+$('csum').addEventListener('click',e=>{
+  const b=e.target.closest('[data-cs]');
+  if(e.target===$('csum')||(b&&b.dataset.cs==='close')) $('csum').hidden=true;
+  else if(b&&b.dataset.cs==='end'){ $('csum').hidden=true; applyBatch([{do:'combat',end:true}]); renderCombat(); }
+});
+addEventListener('keydown',e=>{ if(e.key==='Escape'&&!$('csum').hidden) $('csum').hidden=true; });
 
 /* =============================== side panel =============================== */
 let SIDE_TAB=null;
@@ -4138,6 +4620,8 @@ function openSide(tab, force){
   $('claudebtn').classList.toggle('on', SIDE_TAB==='claude');
   $('dice').classList.toggle('on', SIDE_TAB==='dice');
   $('buildbtn').classList.toggle('on', SIDE_TAB==='build');
+  $('combatbtn').classList.toggle('on', SIDE_TAB==='combat');
+  if(SIDE_TAB==='combat' && typeof renderCombat==='function') renderCombat();
   if(SIDE_TAB==='build' && typeof renderBuilder==='function') renderBuilder();
   if(SIDE_TAB==='claude' && typeof renderClaude==='function') renderClaude();
   if(SIDE_TAB!=='build' && typeof setBuildTool==='function') setBuildTool(null);
@@ -5104,7 +5588,8 @@ const COMMAND_CARD=`Board commands are JSON objects; send them as an array. A sq
 - {"do":"save","t":"W","mod":5,"dc":18,"damage":"4d6","cond":"prone"}: PF2e basic save (crit success none, success half, failure full, crit failure double); 5e success halves ("half":false for none). cond is added on a failure.
 - {"do":"check","t":"H","mod":6,"dc":15,"label":"Medicine"}
 - {"do":"damage","t":"sk1","n":7} · {"do":"heal","t":"G","n":5}
-- {"do":"cond","t":"G","add":["prone"],"remove":["frightened"]}: prone grabbed restrained frightened blinded stunned poisoned burning bleeding slowed offguard blessed
+- {"do":"cond","t":"G","add":["prone","frightened 2","burning 1d6",{"name":"slowed","value":1,"rounds":2}],"remove":["grabbed"]}: a number after a name is its value; dice after burning, bleeding or poisoned are persistent damage; rounds counts down at the end of that token's turn. Names: prone grabbed restrained immobilized frightened sickened slowed stunned enfeebled drained clumsy stupefied doomed blinded offguard poisoned burning bleeding fatigued confused fleeing quickened hidden invisible blessed
+- The board runs turn effects itself when a turn ends: frightened drops by 1 (PF2e), timed conditions run out, persistent damage hits and then gets a DC 15 flat check (PF2e). A PC at 0 HP becomes unconscious and dying (PF2e: dying 1 plus wounded, recovery checks at the start of their turn; 5e: death saves). Healing them clears dying. Don't apply these by hand.
 - {"do":"combat"}: rolls initiative for everyone on the board from their init bonus and starts round 1 · {"do":"combat","end":true}
 - {"do":"next"}: ends the current turn · {"do":"turn","active":"Grit"}
 - {"do":"spawn","token":{"id":"gh2","name":"Ghoul 2","at":"C5","kind":"foe","art":"ghoul","hp":22,"ac":13,"init":8}} · {"do":"remove","t":"gh2"}
@@ -5148,6 +5633,19 @@ function checkCmds(cmds){
       if(t.id&&S.tokens.some(x=>x.id===String(t.id))) errs.push(`#${i+1}: a token with id "${t.id}" is already on the board`); }
     if(d==='marker'&&c.marker) sq(c.marker.at,i,'marker.at');
     if(d==='roll'){ try{ parseDice(String(c.dice||c.d||'d20')); }catch(e){ errs.push(`#${i+1}: "${c.dice}" is not dice`); } }
+    if(d==='cond'||(d==='save'&&c.cond!==undefined)){
+      const list=d==='cond'?[].concat(c.add??[],c.remove==='all'?[]:(c.remove??[])):[].concat(c.cond);
+      if(d==='cond'&&c.add===undefined&&c.remove===undefined) errs.push(`#${i+1}: cond needs "add" or "remove"`);
+      for(const x of list){ let sp;
+        try{ sp=parseCondSpec(x); }catch(e){ errs.push(`#${i+1}: ${e}`); continue; }
+        if(!COND_TITLES[sp.name]) errs.push(`#${i+1}: unknown condition "${sp.name}" (use one of: ${Object.keys(COND_TITLES).join(' ')})`);
+        if(sp.rounds!==null&&sp.rounds!==undefined&&!(Number.isInteger(+sp.rounds)&&+sp.rounds>=1&&+sp.rounds<=100)) errs.push(`#${i+1}: rounds must be a whole number 1–100`); }
+      for(const k of ['value','rounds']) if(c[k]!==undefined&&typeof c[k]!=='object'&&k==='value'){ try{ condValue(c[k]); }catch(e){ errs.push(`#${i+1}: ${e}`); } }
+      if(c.rounds!==undefined&&typeof c.rounds!=='object'&&!(Number.isInteger(+c.rounds)&&+c.rounds>=1&&+c.rounds<=100)) errs.push(`#${i+1}: rounds must be a whole number 1–100`);
+    }
+    if((d==='damage'||d==='heal')&&Math.abs(+(c.n??c.hp))>9999) errs.push(`#${i+1}: ${d} of ${c.n??c.hp} is not believable`);
+    if((d==='attack'||d==='strike')&&c.bonus!==undefined&&!Number.isFinite(+c.bonus)) errs.push(`#${i+1}: bonus must be a number`);
+    if((d==='check'||d==='save')&&(c.mod??c.bonus)!==undefined&&!Number.isFinite(+(c.mod??c.bonus))) errs.push(`#${i+1}: mod must be a number`);
   });
   return errs;
 }
@@ -5176,6 +5674,8 @@ function applyTransaction(cmds, by){
   }
   undoStack=[before];
   for(const m of results) logLine((by?by+' · ':'')+m, /^GM:/.test(m)?'say':'');
+  cmds.forEach((c,i)=>{ if(/^(attack|strike|save|check|damage|heal|cond)$/.test(String(c.do).toLowerCase())) clog(String(results[i]).replace(/^🎲 /,'')); });
+  checkVictory();
   save();
   return results;
 }
